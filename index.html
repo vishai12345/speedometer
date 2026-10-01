@@ -208,6 +208,14 @@ body[data-view="drive"].hudbg .tripline, body[data-view="drive"].hudbg .brand{co
 .gateicon .i{width:26px;height:26px}
 .gate[data-kind="denied"] .gateicon,.gate[data-kind="off"] .gateicon,.gate[data-kind="unsupported"] .gateicon{background:var(--alert-soft);color:var(--alert)}
 .gate[data-kind="asking"] .gateicon{animation:pulse 1.6s infinite}
+/* checking: a light loader over the blurred speedometer, no card */
+.gate[data-kind="checking"] .gatecard{background:transparent;border:0;box-shadow:none;text-align:center;max-width:280px}
+.gate[data-kind="checking"] .gateicon{margin:0 auto var(--s4);background:transparent}
+.gate[data-kind="checking"] .gateicon .i{display:none}
+.gate[data-kind="checking"] .gateicon::after{content:"";width:40px;height:40px;border-radius:50%;border:3px solid var(--line);border-top-color:var(--accent);animation:spin .9s linear infinite}
+.gate[data-kind="checking"] .gatecard h2{font-size:var(--fs-l)}
+@keyframes spin{to{transform:rotate(360deg)}}
+.gate.fade{opacity:0;transition:opacity var(--dur) var(--ease)}
 .gatecard h2{font-size:var(--fs-xl);margin-bottom:6px}
 .gatecard p{color:var(--muted)}
 .gatecard ol{margin:0 0 var(--s4);padding-left:20px;font-size:14px}
@@ -295,7 +303,7 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
   <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
 </svg>
-<div class="app" id="app">
+<div class="app gated" id="app">
 
   <!-- ===================== DRIVE ===================== -->
   <section class="view drive" data-view="drive" aria-label="Speedometer">
@@ -352,14 +360,14 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
       </div>
     </div>
 
-    <div class="gate" id="gate" hidden role="dialog" aria-labelledby="gateTitle">
+    <div class="gate" id="gate" data-kind="checking" role="dialog" aria-labelledby="gateTitle" aria-busy="true">
       <div class="gatecard">
         <div class="gateicon"><svg class="i"><use href="#i-pin"/></svg></div>
-        <h2 id="gateTitle">Allow location to start</h2>
-        <p id="gateText">Pacer reads your speed from your phone's GPS. Tap Allow when your browser asks.</p>
+        <h2 id="gateTitle">Checking location access</h2>
+        <p id="gateText">One moment…</p>
         <div id="gateSteps"></div>
         <div class="gatebtns">
-          <button class="btn primary" id="gateBtn">Enable location</button>
+          <button class="btn primary" id="gateBtn" hidden>Enable location</button>
           <button class="linkbtn" id="gateReload" hidden>Still stuck? Reload the page</button>
         </div>
       </div>
@@ -476,7 +484,7 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 
   <!-- ===================== ABOUT ===================== -->
   <section class="view about" data-view="about" hidden aria-label="About">
-    <div class="pagehead"><div><div class="eyebrow">Version 3.1</div><h1>About Pacer</h1></div></div>
+    <div class="pagehead"><div><div class="eyebrow">Version 3.2</div><h1>About Pacer</h1></div></div>
     <section>
       <p>Pacer turns your phone's GPS into a speedometer. It runs in the browser, works offline once loaded, and never sends your location anywhere.</p>
     </section>
@@ -594,6 +602,7 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     } catch { setGate("unsupported"); }
   }
   function onPosition(p) {
+    if (!gotFirst) store.set("locGranted", true);   // lets browsers without the Permissions API skip the card next time
     gotFirst = true;
     if (gateKind) setGate(null);
     const c = p.coords;
@@ -601,7 +610,7 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     if (res.ok) recordPoint(p, res);
   }
   function onPositionError(e) {
-    if (e.code === 1) { stopGps(); setGate("denied"); }
+    if (e.code === 1) { stopGps(); store.set("locGranted", false); setGate("denied"); }
     else if (e.code === 2 && !gotFirst) setGate("off");
     else if (gateKind === "asking") setGate(null);
   }
@@ -639,10 +648,12 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
     for (const sel of [".stage", ".secondary", ".controls"]) $(sel).inert = on;
     if (!on) return;
     g.dataset.kind = kind;
+    g.setAttribute("aria-busy", kind === "checking" ? "true" : "false");
     const secure = "https://" + location.host + location.pathname;
     const copy = {
       requesting: ["Turn on location to start", "Pacer measures your speed with your phone's GPS. Your location stays on this phone and is never uploaded.", "Enable location"],
       asking: ["Allow location", "Choose Allow in the box your browser is showing.", ""],
+      checking: ["Checking location access", "One moment…", ""],
       denied: ["Location is blocked", "Pacer can't show your speed until this site is allowed to use your location.", "Try again"],
       off: ["Turn on location services", "Your phone's location is switched off, or it can't find a position yet.", "Try again"],
       insecure: ["Open the secure link", location.protocol === "http:" ? "Location only works over HTTPS. Open " + secure : "Location only works when Pacer is opened from its https:// web address, not from a saved file.", location.protocol === "http:" ? "Open secure link" : ""],
@@ -665,15 +676,34 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   $("#gateReload").onclick = () => location.reload();
   // Permission policy (hybrid): if location was already granted, start GPS straight away (no prompt can appear).
   // Otherwise never prompt on load: explain first, and start only when the user taps Enable location.
+  // On load a loader covers the speedometer while the permission state is checked:
+  //   granted                  -> loader fades out, speedometer shows, GPS starts (no prompt can appear)
+  //   prompt                   -> "Turn on location" card; GPS starts only after the tap
+  //   denied                   -> recovery steps
+  //   unknown (no Permissions API, or the check hangs) -> start directly if this phone allowed Pacer before, else the card
   async function bootLocation() {
+    setGate("checking");
+    const shownAt = performance.now();
     let perm = null;
-    try { perm = await navigator.permissions?.query({ name: "geolocation" }); } catch {}
-    if (perm) {
-      perm.onchange = () => { if (perm.state === "granted" && gateKind) startGps(); else if (perm.state === "denied") { stopGps(); setGate("denied"); } };
-      if (perm.state === "granted") return startGps();
-      return setGate(perm.state === "denied" ? "denied" : "requesting");
-    }
-    setGate("requesting");   // Permissions API unavailable (older Safari): wait for the tap
+    try {
+      perm = await Promise.race([
+        navigator.permissions.query({ name: "geolocation" }),
+        new Promise((_, rej) => setTimeout(() => rej(new Error("timeout")), 2500))
+      ]);
+    } catch {}
+    // keep the loader up briefly so it reads as a deliberate step, not a flicker
+    const wait = Math.max(0, 450 - (performance.now() - shownAt));
+    await new Promise(r => setTimeout(r, reduceMotion ? 0 : wait));
+    if (perm) perm.onchange = () => { if (perm.state === "granted" && gateKind) startGps(); else if (perm.state === "denied") { stopGps(); setGate("denied"); } };
+    const state = perm ? perm.state : (store.get("locGranted", false) === true ? "granted" : "unknown");
+    if (state === "granted") { revealSpeedometer(); startGps(); }
+    else setGate(state === "denied" ? "denied" : "requesting");
+  }
+  function revealSpeedometer() {
+    const g = $("#gate");
+    if (reduceMotion) return setGate(null);
+    g.classList.add("fade");
+    setTimeout(() => { g.classList.remove("fade"); if (gateKind === "checking") setGate(null); }, 280);
   }
 
   // =====================================================================
@@ -857,6 +887,7 @@ td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
   const fmtSpeed = ms => ms === null ? "––" : S.unit === "ms" ? (ms).toFixed(1) : String(Math.round(ms * U().f));
 
   function statusInfo(now) {
+    if (gateKind === "checking") return { s: "acquiring", text: "Checking location", q: 0 };
     if (gateKind) return { s: "blocked", text: "Location needed", q: 0 };
     const st = engine.status(now), acc = engine.accuracy();
     if (st === "idle" || st === "acquiring") return { s: "acquiring", text: "Finding GPS", q: 0 };

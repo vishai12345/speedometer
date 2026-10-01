@@ -1,8 +1,8 @@
-# Verification report: Pacer v3.1
+# Verification report: Pacer v3.2
 
 Response to the third-iteration review. Evidence is from the code in this repository and from test runs on it. Every requirement below lists previous behaviour, updated behaviour, the code changed, the test and the result.
 
-**Raw evidence:** [`test-results/engine-tests.txt`](test-results/engine-tests.txt) (26/26), [`test-results/browser-tests.txt`](test-results/browser-tests.txt) (31/31, no page errors), [`screenshots/`](screenshots/).
+**Raw evidence:** [`test-results/engine-tests.txt`](test-results/engine-tests.txt) (26/26), [`test-results/browser-tests.txt`](test-results/browser-tests.txt) (35/35, no page errors), [`screenshots/`](screenshots/).
 
 **Not claimed:** no test in this report was run on a physical phone. Browser tests run in desktop Chromium with phone viewports, an iPhone user agent and a scripted fake GPS. Engine tests use synthetic GPS traces with known ground truth, not recorded drives.
 
@@ -19,19 +19,22 @@ Several "outstanding" items (50 m rejection threshold, per-frame distance integr
 
 ## 1. Requirement-by-requirement
 
-### 2.1 Permission flow — fixed in v3.1
-- **Previous:** v3.0 called `watchPosition()` on page load, so a prompt could appear without user action. This was the product owner's earlier instruction, but it conflicted with the review.
-- **Decision (product owner):** hybrid. If permission is already *granted*, GPS starts on load; no prompt is possible in that state. If it is *prompt* or unknown, nothing starts until the user taps **Enable location**. If *denied*, recovery steps are shown and no watch is started.
-- **Code:** `index.html` → `bootLocation()`, `#gateBtn` handler, `startGps()` (calls `stopGps()` first, so repeated taps can't stack watchers), new `asking` gate state, and a 20 s fallback that re-offers the button if a prompt is dismissed silently.
-- **Tests:** R1, R1b, R2, R2b, R3, R3b.
+### 2.1 Permission flow — fixed in v3.1, refined in v3.2
+- **Previous:** v3.0 called `watchPosition()` on page load, so a prompt could appear without user action.
+- **Current (v3.2):** on load a loader ("Checking location access") covers the locked, blurred speedometer while the permission state is read. It stays at least 450 ms so it doesn't flicker, and the check times out after 2.5 s.
+  - **Already allowed:** the loader fades out, the speedometer shows and GPS starts. No card appears, and no prompt is possible.
+  - **Not yet allowed:** the "Turn on location" card appears. GPS starts only after the user taps **Enable location**.
+  - **Denied:** recovery steps are shown, and no GPS watch is started.
+  - **Browser can't report permission** (older Safari): Pacer starts directly if this phone delivered a GPS fix before (remembered locally); otherwise it shows the card.
+- **Code:** `index.html` → `bootLocation()`, `revealSpeedometer()`, `setGate("checking")`, `onPosition()` (remembers a granted permission), `startGps()` (clears any existing watcher first).
+- **Tests:** L1–L4, R1, R1b, R2, R2b, R3, R3b.
 - **Results:**
-  - On first launch, `watchPosition` is called 0 times.
-  - Three rapid taps leave exactly 1 active watcher.
-  - The first fix unlocks the speedometer.
-  - A returning user who already allowed location starts with no card.
-  - Denied: the watcher is released and 3 platform-specific steps are shown.
-  - Previously denied: no watcher is started.
-- **Limitation:** Safari versions without the Permissions API always show the card (one extra tap). Prompt wording and dismissal behaviour on real iOS and Android are unverified.
+  - During the check: loader shown, speedometer locked, GPS not started.
+  - Allowed: loader gone, 1 watcher.
+  - Not allowed: card, 0 watchers until the tap.
+  - No Permissions API: remembered → straight to the speedometer; first visit → card.
+  - Three rapid taps leave exactly 1 watcher; denied releases the watcher.
+- **Limitation:** on iPhone, if Safari's site setting is "Ask", Safari reports location as not yet allowed on every visit, so the card appears each time. That is Safari's rule, not Pacer's. Real-device behaviour is unverified.
 
 ### 2.2 GPS signal states — already fixed in v3.0, verified
 - **States:** `idle → acquiring → ok | poor → lost` in `Engine.status()`.
@@ -162,7 +165,7 @@ Timestamps come from `Date.now()` on each 1 s sample. Missing data is `null` and
 
 | # | Test | Result | Evidence |
 |---|---|---|---|
-| 1 | Initial page load | PASS | 0 `watchPosition` calls |
+| 1 | Initial page load | PASS | loader while checking; 0 `watchPosition` calls unless already allowed |
 | 2 | Enable location | PASS | 1 watcher after 3 taps |
 | 3 | Denied permission | PASS | steps shown, watcher released |
 | 4 | GPS loss | PASS | "––", "Signal lost", announced |

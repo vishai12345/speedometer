@@ -25,7 +25,10 @@ FAKE = """
       latitude: f.lat, longitude: f.lon, accuracy: f.acc ?? 5, speed: f.speed ?? null, heading: f.heading ?? null, altitude: f.alt ?? 900 } }));
   window.__err = code => Object.values(w).forEach(x => x.err({ code }));
   const q = navigator.permissions.query.bind(navigator.permissions);
-  navigator.permissions.query = d => d && d.name === 'geolocation' ? Promise.resolve({ state: window.__permState, onchange: null }) : q(d);
+  navigator.permissions.query = d => d && d.name === 'geolocation'
+    ? (window.__noPermApi ? Promise.reject(new TypeError('unsupported'))
+       : new Promise(res => setTimeout(() => res({ state: window.__permState, onchange: null }), window.__permDelay || 0)))
+    : q(d);
   if (window.__denyWake) navigator.wakeLock = { request: () => Promise.reject(new DOMException('denied', 'NotAllowedError')) };
 })();
 """
@@ -95,12 +98,33 @@ with sync_playwright() as pw:
           f"started automatically, no card, status '{t(p, '#gpsText')}', speed '{t(p, '#speedNum')}'")
     c.close()
 
+    # L1-L4 Loader while the permission state is checked
+    c = ctx("granted", extra="window.__permDelay=900;"); p = page(c); p.goto(URL); p.wait_for_timeout(250)
+    during = (t(p, "#gateTitle"), p.is_visible("#gate"), p.evaluate("document.querySelector('.stage').inert"), p.evaluate("window.__watchCalls"), t(p, "#gpsText"))
+    shot(p, "00_checking")
+    p.wait_for_timeout(1300)
+    check("L1", "Loader while checking, then speedometer (allowed)", during[0] == "Checking location access" and during[1] and during[2] and during[3] == 0
+          and p.locator("#gate").is_hidden() and p.evaluate("window.__watchCalls") == 1 and not p.evaluate("document.querySelector('.stage').inert"),
+          f"during check: loader shown, speedometer locked, GPS not started, pill '{during[4]}'; after: loader gone, GPS started, no card")
+    c.close()
+    c = ctx("prompt", extra="window.__permDelay=600;"); p = page(c); p.goto(URL); p.wait_for_timeout(250)
+    d1 = t(p, "#gateTitle"); p.wait_for_timeout(900)
+    check("L2", "Loader, then prompt card (not allowed)", d1 == "Checking location access" and t(p, "#gateTitle") == "Turn on location to start" and p.is_visible("#gateBtn") and p.evaluate("window.__watchCalls") == 0,
+          f"'{d1}' → '{t(p, '#gateTitle')}', no GPS until tapped")
+    c.close()
+    c = ctx("granted", extra="window.__noPermApi=true;localStorage.setItem('pacer.locGranted','true');"); p = page(c); p.goto(URL); p.wait_for_timeout(900)
+    check("L3", "No permission API, allowed before: straight to speedometer", p.locator("#gate").is_hidden() and p.evaluate("window.__watchCalls") == 1, "remembered from the last successful fix")
+    c.close()
+    c = ctx("granted", extra="window.__noPermApi=true;"); p = page(c); p.goto(URL); p.wait_for_timeout(900)
+    check("L4", "No permission API, first visit: prompt card", t(p, "#gateTitle") == "Turn on location to start" and p.evaluate("window.__watchCalls") == 0, "card shown, no unsolicited prompt")
+    c.close()
+
     # R3 Denied
-    c = ctx("prompt"); p = page(c); p.goto(URL); p.wait_for_timeout(500); p.click("#gateBtn"); p.evaluate("window.__err(1)"); p.wait_for_timeout(300)
+    c = ctx("prompt"); p = page(c); p.goto(URL); p.wait_for_timeout(900); p.click("#gateBtn"); p.evaluate("window.__err(1)"); p.wait_for_timeout(300)
     check("R3", "Denied permission", t(p, "#gateTitle") == "Location is blocked" and p.locator("#gateSteps li").count() == 3 and p.evaluate("window.__watchers()") == 0,
           f"'{t(p, '#gateTitle')}', {p.locator('#gateSteps li').count()} device-specific steps, watcher released")
     shot(p, "02_denied"); c.close()
-    c = ctx("denied"); p = page(c); p.goto(URL); p.wait_for_timeout(500)
+    c = ctx("denied"); p = page(c); p.goto(URL); p.wait_for_timeout(900)
     check("R3b", "Previously denied: no prompt, recovery shown", p.evaluate("window.__watchCalls") == 0 and t(p, "#gateTitle") == "Location is blocked", "no watch started")
     c.close()
 

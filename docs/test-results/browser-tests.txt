@@ -1,32 +1,36 @@
-PASS  R1   Initial page load                                      watchPosition calls on load: 0; card: 'Turn on location to start'
-PASS  R2   Enable location (tapped 3x)                            active watchers: 1, state: 'Allow location'
-PASS  R2b  First fix unlocks the speedometer                      speed '0'
-PASS  R1b  Returning user (already allowed)                       started automatically, no card, status 'Finding GPS', speed '––'
-PASS  R3   Denied permission                                      'Location is blocked', 3 device-specific steps, watcher released
-PASS  R3b  Previously denied: no prompt, recovery shown           no watch started
-PASS  R0   Before first fix: unavailable, not zero                speed '––', trip '–– km'
-PASS  R6   Stationary device                                      shows 0, distance 0.00 m after 15 s of jitter
-PASS  R7   Moving device (instant 0 → 90 km/h jump)               86 km/h after 2 fixes; the first was held back as physically impossible (>1.2 g)
-PASS  R4   GPS loss                                               '––', 'Signal lost', screen reader: 'GPS signal lost'
-PASS  R5   GPS recovery (12 s gap, 90 → 43 km/h)                  first reading after gap: 43 km/h
-PASS  A1   Overspeed activates once; raising the limit clears it  over=True, alerts=1, after limit 100→120: cleared=True
-PASS  A2   Muted: red state but no sound/vibration                alerts still 1
-PASS  A3   GPS lost during overspeed clears it                    cleared, no stale overspeed
-PASS  R8   Long GPS gap (65 s)                                    distance added across the gap: 0 m (car moved ~1.3 km; gap > 60 s is not invented)
-PASS  R9   Mode switching during recording                        4 points recorded across 4 mode switches (4 fixes)
-PASS  R11  Navigation during recording                            4 points across 4 screen changes, REC indicator still shown
-PASS  R12  Pause and resume                                       while paused: +0.0 m, +0 points; after resume: +61 m for 3 s at 20 m/s
-PASS  R10  Unit switching                                         trip 820.0 m, top 30.00 m/s before and after 4 unit changes
-PASS  R14  Browser refresh during recording                       recording restored with 14 points; toast: 'Recording resumed after reload'
-PASS  R18  Export (GPX + CSV)                                     GPX: valid XML, 17 points; CSV median speed 72.0 km/h (true 72)
-PASS  R18b Export: empty recording not saved                      Nothing was saved: no GPS points were recorded. Record while moving with a GPS signal.
-PASS  R13  Reset                                                  stored distance after reset: 0; after reload Trip shows '––' (no GPS yet)
-PASS  R15  Storage failure                                        message: 'Can't save to this phone's storage. Your trip keeps running, but it won't survive a reload.'; speed still live: 72
-PASS  R16  Wake Lock denial                                       switch off, explained; drive mode still works (72 km/h)
-PASS  R19  Reduced motion                                         display at 21 km/h 120 ms after a 11→22 km/h fix (filtered value; the eased needle would still be near 13); animations: none/0s
-PASS  R17  Canvas resize                                          358px→716px; 220px→440px; 398px→796px; 260px→520px; 358px→716px (square, DPR-scaled)
-PASS  R20p Layout small_360x640                                   no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 220px
-PASS  R20p Layout iphone_390x844                                  no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 358px
-PASS  R20  Layout landscape_844x390                               no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 260px
-PASS  R20  Layout landscape_667x375                               no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 245px
-31 passed, 0 failed, page errors: none
+PASS  R1   Initial page load                                           watchPosition calls on load: 0; card: 'Turn on location to start'
+PASS  R2   Enable location (tapped 3x)                                 active watchers: 1, state: 'Allow location'
+PASS  R2b  First fix unlocks the speedometer                           speed '0'
+PASS  R1b  Returning user (already allowed)                            started automatically, no card, status 'Finding GPS', speed '––'
+PASS  L1   Loader while checking, then speedometer (allowed)           during check: loader shown, speedometer locked, GPS not started, pill 'Checking location'; after: loader gone, GPS started, no card
+PASS  L2   Loader, then prompt card (not allowed)                      'Checking location access' → 'Turn on location to start', no GPS until tapped
+PASS  L3   No permission API, allowed before: straight to speedometer  remembered from the last successful fix
+PASS  L4   No permission API, first visit: prompt card                 card shown, no unsolicited prompt
+PASS  R3   Denied permission                                           'Location is blocked', 3 device-specific steps, watcher released
+PASS  R3b  Previously denied: no prompt, recovery shown                no watch started
+PASS  R0   Before first fix: unavailable, not zero                     speed '––', trip '–– km'
+PASS  R6   Stationary device                                           shows 0, distance 0.00 m after 15 s of jitter
+PASS  R7   Moving device (instant 0 → 90 km/h jump)                    86 km/h after 2 fixes; the first was held back as physically impossible (>1.2 g)
+PASS  R4   GPS loss                                                    '––', 'Signal lost', screen reader: 'GPS signal lost'
+PASS  R5   GPS recovery (12 s gap, 90 → 43 km/h)                       first reading after gap: 43 km/h
+PASS  A1   Overspeed activates once; raising the limit clears it       over=True, alerts=1, after limit 100→120: cleared=True
+PASS  A2   Muted: red state but no sound/vibration                     alerts still 1
+PASS  A3   GPS lost during overspeed clears it                         cleared, no stale overspeed
+PASS  R8   Long GPS gap (65 s)                                         distance added across the gap: 0 m (car moved ~1.3 km; gap > 60 s is not invented)
+PASS  R9   Mode switching during recording                             4 points recorded across 4 mode switches (4 fixes)
+PASS  R11  Navigation during recording                                 4 points across 4 screen changes, REC indicator still shown
+PASS  R12  Pause and resume                                            while paused: +0.0 m, +0 points; after resume: +61 m for 3 s at 20 m/s
+PASS  R10  Unit switching                                              trip 821.3 m, top 30.00 m/s before and after 4 unit changes
+PASS  R14  Browser refresh during recording                            recording restored with 14 points; toast: 'Recording resumed after reload'
+PASS  R18  Export (GPX + CSV)                                          GPX: valid XML, 17 points; CSV median speed 72.0 km/h (true 72)
+PASS  R18b Export: empty recording not saved                           Nothing was saved: no GPS points were recorded. Record while moving with a GPS signal.
+PASS  R13  Reset                                                       stored distance after reset: 0; after reload Trip shows '––' (no GPS yet)
+PASS  R15  Storage failure                                             message: 'Can't save to this phone's storage. Your trip keeps running, but it won't survive a reload.'; speed still live: 72
+PASS  R16  Wake Lock denial                                            switch off, explained; drive mode still works (72 km/h)
+PASS  R19  Reduced motion                                              display at 21 km/h 120 ms after a 11→22 km/h fix (filtered value; the eased needle would still be near 13); animations: none/0s
+PASS  R17  Canvas resize                                               358px→716px; 220px→440px; 398px→796px; 260px→520px; 358px→716px (square, DPR-scaled)
+PASS  R20p Layout small_360x640                                        no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 220px
+PASS  R20p Layout iphone_390x844                                       no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 358px
+PASS  R20  Layout landscape_844x390                                    no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 260px
+PASS  R20  Layout landscape_667x375                                    no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 245px
+35 passed, 0 failed, page errors: none

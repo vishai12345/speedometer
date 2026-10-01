@@ -24,6 +24,30 @@
   "detail": "started automatically, no card, status 'Finding GPS', speed '––'"
  },
  {
+  "id": "L1",
+  "test": "Loader while checking, then speedometer (allowed)",
+  "pass": true,
+  "detail": "during check: loader shown, speedometer locked, GPS not started, pill 'Checking location'; after: loader gone, GPS started, no card"
+ },
+ {
+  "id": "L2",
+  "test": "Loader, then prompt card (not allowed)",
+  "pass": true,
+  "detail": "'Checking location access' → 'Turn on location to start', no GPS until tapped"
+ },
+ {
+  "id": "L3",
+  "test": "No permission API, allowed before: straight to speedometer",
+  "pass": true,
+  "detail": "remembered from the last successful fix"
+ },
+ {
+  "id": "L4",
+  "test": "No permission API, first visit: prompt card",
+  "pass": true,
+  "detail": "card shown, no unsolicited prompt"
+ },
+ {
   "id": "R3",
   "test": "Denied permission",
   "pass": true,
@@ -111,7 +135,7 @@
   "id": "R10",
   "test": "Unit switching",
   "pass": true,
-  "detail": "trip 820.0 m, top 30.00 m/s before and after 4 unit changes"
+  "detail": "trip 821.3 m, top 30.00 m/s before and after 4 unit changes"
  },
  {
   "id": "R14",
