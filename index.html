@@ -1,0 +1,701 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0c1117">
+<title>Pacer Speedometer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
+<style>
+/* Layout: instrument cluster (dial + trip computer) on top, engineering notes below in a single reading column with a section index. */
+:root{
+  --bg:#eceff2; --panel:#ffffff; --sunk:#f4f6f8; --ink:#141c25; --muted:#5a6672; --line:#d3d9e0;
+  --accent:#b86a00; --accent-soft:rgba(184,106,0,.14); --alert:#cf3434; --alert-soft:rgba(207,52,52,.14); --ok:#1d7f54;
+  --needle:#cf3434; --face:#f7f8fa;
+  --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
+  --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --r:12px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0c1117; --panel:#141b23; --sunk:#10161d; --ink:#e6ebf0; --muted:#8b98a6; --line:#25303c;
+  --accent:#ffb12e; --accent-soft:rgba(255,177,46,.15); --alert:#ff5b52; --alert-soft:rgba(255,91,82,.16); --ok:#3fcf8e;
+  --needle:#ff5b52; --face:#0f151c; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0c1117; --panel:#141b23; --sunk:#10161d; --ink:#e6ebf0; --muted:#8b98a6; --line:#25303c;
+  --accent:#ffb12e; --accent-soft:rgba(255,177,46,.15); --alert:#ff5b52; --alert-soft:rgba(255,91,82,.16); --ok:#3fcf8e;
+  --needle:#ff5b52; --face:#0f151c; color-scheme:dark}
+
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
+.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:20px 64px}
+h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;line-height:1.1;text-wrap:balance;margin:0}
+h1{font-size:30px}
+h2{font-size:28px;margin-bottom:12px}
+h3{font-size:19px;margin:22px 0 6px}
+p{margin:0 0 12px}
+a{color:var(--accent)}
+code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:16px}
+.top p{margin:4px 0 0;color:var(--muted);max-width:60ch}
+.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+.status[data-s="ok"] .dot{background:var(--ok)}
+.status[data-s="sim"] .dot{background:var(--accent)}
+.status[data-s="bad"] .dot{background:var(--alert)}
+.status[data-s="wait"] .dot{background:var(--muted);animation:pulse 1.2s infinite}
+@keyframes pulse{50%{opacity:.25}}
+
+/* cluster */
+.cluster{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
+@media (max-width:820px){.cluster{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.dialbox{display:flex;flex-direction:column;align-items:center;gap:14px}
+.dial{position:relative;width:100%;max-width:440px;aspect-ratio:1;max-height:440px}
+.dial canvas{position:absolute;inset:0;width:100%;height:100%}
+.readout{position:absolute;left:0;right:0;top:56%;text-align:center;pointer-events:none}
+.readout .v{font-family:var(--f-display);font-weight:700;font-size:clamp(56px,17vw,88px);line-height:.9;font-variant-numeric:tabular-nums;transition:color .2s}
+.readout .u{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.over .readout .v{color:var(--alert)}
+.flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
+.over .flag{visibility:visible;animation:pulse .9s infinite}
+
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
+.seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+
+.side{display:flex;flex-direction:column;gap:16px}
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stat{background:var(--panel);padding:12px 14px}
+.stat .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stat .n{font-family:var(--f-display);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.stat .n small{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
+.spark{width:100%;height:84px;display:block}
+.ctl{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center}
+.ctl label{font-size:13px;color:var(--muted)}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content}
+.stepper button{border:0;background:var(--sunk);width:36px;height:34px;cursor:pointer;font-size:17px}
+.stepper input{width:64px;height:34px;border:0;border-inline:1px solid var(--line);background:var(--panel);text-align:center;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:500}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
+.note{font-size:13px;color:var(--muted);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0}
+
+/* docs */
+.docs{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;margin-top:48px}
+@media (max-width:820px){.docs{grid-template-columns:minmax(0,1fr);gap:16px}}
+.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);align-self:start;display:flex;flex-direction:column;gap:2px}
+@media (max-width:820px){.toc{position:static;flex-direction:row;flex-wrap:wrap;gap:6px}}
+.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:6px}
+.toc a:hover{color:var(--ink);background:var(--panel)}
+.docs section{max-width:72ch;margin-bottom:44px;min-width:0}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:12px 0}
+table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+tr:last-child td{border-bottom:0}
+td:first-child{white-space:nowrap;font-weight:600}
+pre{overflow-x:auto;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:14px;font-family:var(--f-mono);font-size:12.5px;line-height:1.6;margin:10px 0 16px}
+pre code{background:none;border:0;padding:0;font-size:inherit}
+.eq{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border-left:3px solid var(--accent);padding:10px 14px;margin:10px 0 14px;overflow-x:auto;white-space:pre}
+ol.steps{padding-left:22px;margin:0}
+ol.steps li{margin-bottom:12px}
+ol.steps li::marker{font-family:var(--f-display);font-weight:700;color:var(--accent)}
+ul{padding-left:20px}
+.diagram{overflow-x:auto;margin:12px 0}
+.diagram svg{display:block;min-width:620px;width:100%;height:auto}
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+</head>
+<body>
+
+
+<div class="wrap" id="app">
+  <header class="top">
+    <div>
+      <div class="eyebrow">Web instrument · v1.0</div>
+      <h1>Pacer Speedometer</h1>
+      <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and an overspeed alert. Opens on a simulated drive so you can see it working right away.</p>
+    </div>
+    <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Simulated drive</span></div>
+  </header>
+
+  <div class="cluster">
+    <div class="panel dialbox" id="dialPanel">
+      <div class="dial">
+        <canvas id="gauge" aria-hidden="true"></canvas>
+        <div class="readout">
+          <div class="v" id="speedNum">0</div>
+          <div class="u" id="speedUnit">km/h</div>
+          <span class="flag">Over limit</span>
+        </div>
+      </div>
+      <div class="sr" id="live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div>
+      <div class="row" style="justify-content:center">
+        <div class="seg" role="group" aria-label="Speed source">
+          <button id="modeSim" aria-pressed="true">Simulator</button>
+          <button id="modeGps" aria-pressed="false">Device GPS</button>
+        </div>
+        <div class="seg" role="group" aria-label="Units" id="unitSeg">
+          <button data-u="kmh" aria-pressed="true">km/h</button>
+          <button data-u="mph" aria-pressed="false">mph</button>
+          <button data-u="ms" aria-pressed="false">m/s</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="side">
+      <div class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:12px">
+          <div class="eyebrow">Trip computer</div>
+          <button class="btn" id="resetTrip">Reset trip</button>
+        </div>
+        <div class="stats">
+          <div class="stat"><div class="k">Distance</div><div class="n"><span id="tDist">0.00</span><small id="tDistU">km</small></div></div>
+          <div class="stat"><div class="k">Elapsed</div><div class="n"><span id="tTime">0:00</span></div></div>
+          <div class="stat"><div class="k">Average (moving)</div><div class="n"><span id="tAvg">0</span><small class="uLbl">km/h</small></div></div>
+          <div class="stat"><div class="k">Top speed</div><div class="n"><span id="tMax">0</span><small class="uLbl">km/h</small></div></div>
+        </div>
+        <div style="margin-top:14px">
+          <div class="row" style="justify-content:space-between"><div class="eyebrow">Last 60 seconds</div><div class="eyebrow" id="accText">±– m</div></div>
+          <canvas class="spark" id="spark" aria-label="Speed over the last 60 seconds"></canvas>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="eyebrow" style="margin-bottom:12px">Alerts &amp; device</div>
+        <div class="ctl">
+          <label for="limit">Speed limit</label>
+          <div class="stepper">
+            <button id="limDown" aria-label="Lower limit">−</button>
+            <input id="limit" type="number" inputmode="numeric" min="5" max="300" step="5" value="100">
+            <button id="limUp" aria-label="Raise limit">+</button>
+          </div>
+          <label for="soundBtn">Chime</label>
+          <div><button class="btn" id="soundBtn" aria-pressed="false">Chime when over limit</button></div>
+          <label for="wakeBtn">Screen</label>
+          <div><button class="btn" id="wakeBtn" aria-pressed="false">Keep screen on</button></div>
+        </div>
+        <p class="note" id="note" style="margin-top:14px">Device GPS needs this file hosted on an HTTPS site and a phone with location on. Tap Device GPS to start.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="docs">
+    <nav class="toc" aria-label="Sections">
+      <span class="eyebrow" style="padding:4px 8px">Engineering notes</span>
+      <a href="#components">Components</a>
+      <a href="#design">Design</a>
+      <a href="#principle">Working principle</a>
+      <a href="#build">Implementation</a>
+      <a href="#deploy">Deploy</a>
+    </nav>
+    <div style="min-width:0">
+
+<section id="components">
+  <h2>Components</h2>
+  <p>The app is split into small units with one job each. Sources produce raw fixes, the estimator turns them into one trusted speed, and everything on screen reads from a single state object.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Component</th><th>Responsibility</th><th>Web API</th></tr></thead>
+    <tbody>
+      <tr><td>GpsSource</td><td>Streams position fixes with Doppler speed and accuracy radius</td><td><code>geolocation.watchPosition</code></td></tr>
+      <tr><td>SimSource</td><td>Replays a drive cycle with sensor noise at 2 Hz for testing and demos</td><td><code>setInterval</code></td></tr>
+      <tr><td>Fix validator</td><td>Drops fixes with accuracy worse than 50 m, impossible jumps and stale timestamps</td><td>—</td></tr>
+      <tr><td>SpeedKalman</td><td>1-D Kalman filter that fuses noisy readings into a smooth speed estimate</td><td>—</td></tr>
+      <tr><td>Haversine fallback</td><td>Derives speed from distance ÷ time when the device reports no Doppler speed</td><td>—</td></tr>
+      <tr><td>Trip computer</td><td>Integrates distance, moving time, average and top speed</td><td>—</td></tr>
+      <tr><td>Alert engine</td><td>Compares speed to the limit; drives the red state and the chime</td><td>Web Audio</td></tr>
+      <tr><td>Gauge renderer</td><td>Draws the dial, ticks, limit band and spring-damped needle on a HiDPI canvas</td><td>Canvas 2D, <code>requestAnimationFrame</code></td></tr>
+      <tr><td>Settings store</td><td>Remembers units and the limit on this device</td><td><code>localStorage</code></td></tr>
+      <tr><td>Wake lock</td><td>Stops the phone screen dimming while driving</td><td>Screen Wake Lock</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section id="design">
+  <h2>Design</h2>
+  <p>Data flows in one direction. The sensor runs at about 1 Hz while the screen runs at 60 fps, so the two are decoupled: fixes update the estimate, and the render loop animates toward it.</p>
+  <div class="diagram">
+    <svg viewBox="0 0 760 210" role="img" aria-label="Pipeline: GPS or simulator, validator, Kalman filter, state, then gauge, trip computer and alerts">
+      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
+      <g font-family="IBM Plex Sans, system-ui, sans-serif" font-size="13" fill="var(--ink)">
+        <rect x="10" y="30" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="57" text-anchor="middle">GpsSource</text>
+        <rect x="10" y="120" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="147" text-anchor="middle">SimSource</text>
+        <rect x="170" y="75" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="230" y="102" text-anchor="middle">Validator</text>
+        <rect x="330" y="75" width="120" height="44" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="390" y="102" text-anchor="middle">Kalman filter</text>
+        <rect x="490" y="75" width="90" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="535" y="102" text-anchor="middle">State</text>
+        <rect x="620" y="14" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="39" text-anchor="middle">Gauge (60 fps)</text>
+        <rect x="620" y="77" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="102" text-anchor="middle">Trip computer</text>
+        <rect x="620" y="140" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="165" text-anchor="middle">Alerts</text>
+      </g>
+      <g stroke="var(--muted)" stroke-width="1.5" fill="none" marker-end="url(#ar)">
+        <path d="M130 52 C150 52 150 90 168 92"/><path d="M130 142 C150 142 150 104 168 102"/>
+        <path d="M290 97 H328"/><path d="M450 97 H488"/>
+        <path d="M580 92 C600 70 600 34 618 34"/><path d="M580 97 H618"/><path d="M580 102 C600 124 600 160 618 160"/>
+      </g>
+      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">
+        <text x="300" y="140">fix ~1 Hz</text><text x="455" y="140">speed + P</text><text x="560" y="200">rAF + spring damping</text>
+      </g>
+    </svg>
+  </div>
+  <ul>
+    <li><strong>SI units inside.</strong> All maths runs in metres and seconds. Units are converted only at display time, so switching km/h ↔ mph never corrupts trip data.</li>
+    <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS, simulator, or an OBD-II adapter later).</li>
+    <li><strong>Canvas for the dial, DOM for text.</strong> The dial redraws every frame on a <code>devicePixelRatio</code>-scaled canvas; numbers stay as real text so they are crisp, selectable and readable by screen readers.</li>
+    <li><strong>Accessible at sensor rate.</strong> A polite live region announces speed every few seconds, not 60 times a second.</li>
+    <li><strong>Theme-aware.</strong> The canvas reads its colours from CSS tokens, so light and dark mode match the rest of the page.</li>
+  </ul>
+</section>
+
+<section id="principle">
+  <h2>Working principle</h2>
+  <h3>1. Measuring speed</h3>
+  <p>A phone GNSS chip measures speed from the Doppler shift of satellite signals and exposes it as <code>coords.speed</code> in m/s. This is far more accurate (typically 0.1–0.5 m/s) than differencing positions, because position error is several metres per fix. When <code>speed</code> is <code>null</code>, the app falls back to distance between two fixes divided by elapsed time, using the haversine formula:</p>
+  <div class="eq">a = sin²(Δφ/2) + cos φ₁ · cos φ₂ · sin²(Δλ/2)
+d = 2R · atan2(√a, √(1−a))      R = 6 371 000 m
+v = d / Δt</div>
+  <h3>2. Filtering noise</h3>
+  <p>Raw readings jitter. A one-dimensional Kalman filter models speed as a random walk driven by acceleration noise σ<sub>a</sub>, and weights each reading by its uncertainty r (derived from the reported accuracy):</p>
+  <div class="eq">predict:  P ← P + σa² · Δt²
+gain:     K = P / (P + r)
+update:   v ← v + K · (z − v)
+          P ← (1 − K) · P</div>
+  <p>Good fixes (small r) move the estimate quickly; poor fixes barely nudge it. Fixes with accuracy worse than 50 m are rejected outright.</p>
+  <h3>3. Moving the needle</h3>
+  <p>The estimate changes once per fix, which would make the needle jump. The render loop drives the needle with a critically damped spring, which settles fast with no overshoot:</p>
+  <div class="eq">a = ω² · (target − x) − 2ω · ẋ      ω = 6 rad/s
+ẋ ← ẋ + a · Δt
+x ← x + ẋ · Δt</div>
+  <h3>4. Trip maths</h3>
+  <p>Distance integrates the filtered speed each frame (d += v·Δt), counting only above 0.5 m/s so GPS drift while parked adds nothing. Average speed is distance over moving time, matching how car trip computers report it.</p>
+</section>
+
+<section id="build">
+  <h2>Implementation</h2>
+  <ol class="steps">
+    <li><strong>Scaffold one HTML file</strong> with a square container holding a <code>&lt;canvas&gt;</code> and an overlaid text readout. Serve it over HTTPS; browsers expose geolocation only in secure contexts.</li>
+    <li><strong>Write the sensor adapter.</strong> Wrap <code>watchPosition</code> with <code>enableHighAccuracy: true</code> and <code>maximumAge: 0</code>. Map each position to <code>{t, lat, lon, acc, speed}</code>. Handle error code 1 (denied) by switching to the simulator, and codes 2 and 3 by showing a "waiting for fix" state.
+<pre><code>watchPosition(p =&gt; onFix({
+  t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude,
+  acc: p.coords.accuracy, speed: p.coords.speed
+}), onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });</code></pre></li>
+    <li><strong>Validate fixes.</strong> Drop accuracy &gt; 50 m, Δt &lt; 0.5 s for differenced speeds, and anything above 90 m/s (324 km/h).</li>
+    <li><strong>Add the Kalman filter.</strong>
+<pre><code>class SpeedKalman {
+  constructor(sigmaA = 1.2) { this.sa2 = sigmaA ** 2; this.reset(); }
+  reset() { this.x = 0; this.P = 25; this.t = null; }
+  update(z, r, t) {
+    if (this.t === null) { this.x = z; this.P = r; this.t = t; return z; }
+    const dt = Math.min(Math.max((t - this.t) / 1000, 0.001), 10);
+    this.t = t;
+    this.P += this.sa2 * dt * dt;
+    const K = this.P / (this.P + r);
+    this.x = Math.max(0, this.x + K * (z - this.x));
+    this.P *= 1 - K;
+    return this.x;
+  }
+}</code></pre></li>
+    <li><strong>Add the haversine fallback</strong> for devices that report <code>speed: null</code>; set r from the combined accuracy of both fixes divided by Δt.</li>
+    <li><strong>Build the render loop</strong> with <code>requestAnimationFrame</code>, clamping Δt to 50 ms so a backgrounded tab doesn't fling the needle when it returns.
+<pre><code>const w = 6;
+const acc = w*w*(target - x) - 2*w*v;
+v += acc * dt; x += v * dt;</code></pre></li>
+    <li><strong>Draw the dial.</strong> Size the canvas with a <code>ResizeObserver</code> to <code>clientWidth × devicePixelRatio</code>. Use a 270° sweep starting at 135°; map speed to angle with <code>start + sweep · v / max</code>. Draw the track, the over-limit band, the progress arc, minor and major ticks with labels, then the needle and hub.</li>
+    <li><strong>Add the trip computer and sparkline.</strong> Integrate distance per frame, sample speed every 500 ms into a 120-point ring buffer and plot it with the limit as a dashed line.</li>
+    <li><strong>Add alerts.</strong> When the needle passes the limit, set an <code>.over</code> class for the red state and play a short Web Audio tone every 1.5 s. Start audio only after a tap, as browsers require.</li>
+    <li><strong>Persist settings and hold the screen.</strong> Save units and limit to <code>localStorage</code> inside try/catch. Request <code>navigator.wakeLock.request('screen')</code> and re-request it on <code>visibilitychange</code>.</li>
+    <li><strong>Test with the simulator</strong>, which runs a city–highway–overspeed–braking cycle with Gaussian noise, then test on a real phone outdoors with a clear sky view.</li>
+  </ol>
+</section>
+
+<section id="deploy">
+  <h2>Deploy</h2>
+  <p>The whole app is one self-contained <code>index.html</code> with no build step and no backend. Location data never leaves the device.</p>
+  <ol class="steps">
+    <li>Rename the downloaded file to <code>index.html</code>.</li>
+    <li>Host it on any HTTPS static host: drag it onto Netlify Drop, push it to a GitHub Pages repo, or run <code>npx vercel</code> in its folder.</li>
+    <li>Open the HTTPS address on your phone, choose <strong>Device GPS</strong> and allow location.</li>
+    <li>Optional: add a web app manifest and a service worker so it installs to the home screen and works offline.</li>
+  </ol>
+  <h3>Production checklist</h3>
+  <ul>
+    <li>HTTPS only; geolocation is blocked on plain HTTP.</li>
+    <li>Ask for location from a button tap, never on page load, so permission prompts have context.</li>
+    <li>Show signal state at all times: waiting, weak (accuracy shown), lost after 5 s without a fix.</li>
+    <li>iOS Safari pauses location when the screen locks; the wake lock keeps it running.</li>
+    <li>GPS speed lags reality by roughly 0.5–1 s. Treat this as a driver aid, not a calibrated instrument.</li>
+  </ul>
+</section>
+    </div>
+  </div>
+</div>
+
+<script>
+(() => {
+  "use strict";
+  const $ = s => document.querySelector(s);
+  const root = document.getElementById("app");
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  // ---------- Units (internal SI: m/s, m) ----------
+  const UNITS = {
+    kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km", df: 0.001 },
+    mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi", df: 0.000621371 },
+    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km", df: 0.001 }
+  };
+
+  // ---------- Settings store ----------
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("pacer." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
+    set(k, v) { try { localStorage.setItem("pacer." + k, JSON.stringify(v)); } catch {} }
+  };
+
+  // ---------- State ----------
+  const state = {
+    unit: UNITS[store.get("unit", "kmh")] ? store.get("unit", "kmh") : "kmh",
+    limitMs: store.get("limitMs", 100 / 3.6),
+    mode: "sim",
+    est: 0, shown: 0, vel: 0,
+    lastRecv: 0, acc: null,
+    trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
+    hist: [], sound: false
+  };
+
+  // ---------- Estimator ----------
+  class SpeedKalman {
+    constructor(sigmaA = 1.2) { this.sa2 = sigmaA * sigmaA; this.reset(); }
+    reset() { this.x = 0; this.P = 25; this.t = null; }
+    update(z, r, t) {
+      if (this.t === null) { this.x = z; this.P = r; this.t = t; return z; }
+      const dt = Math.min(Math.max((t - this.t) / 1000, 0.001), 10);
+      this.t = t;
+      this.P += this.sa2 * dt * dt;
+      const K = this.P / (this.P + r);
+      this.x = Math.max(0, this.x + K * (z - this.x));
+      this.P *= 1 - K;
+      return this.x;
+    }
+  }
+  const kf = new SpeedKalman();
+
+  const toRad = d => d * Math.PI / 180;
+  function haversine(a, b) {
+    const R = 6371000, dφ = toRad(b.lat - a.lat), dλ = toRad(b.lon - a.lon);
+    const h = Math.sin(dφ / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dλ / 2) ** 2;
+    return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  }
+
+  const MAX_ACC = 50, MAX_SPEED = 90;
+  let prevFix = null;
+  function onFix(f) {
+    state.lastRecv = performance.now();
+    state.acc = f.acc;
+    if (f.acc != null && f.acc > MAX_ACC) { setStatus("bad", "Weak signal · ±" + Math.round(f.acc) + " m"); return; }
+    let z = null, r = 1;
+    if (Number.isFinite(f.speed) && f.speed >= 0) {
+      z = f.speed; r = Math.pow(0.3 + (f.acc || 5) / 25, 2);
+    } else if (prevFix && f.lat != null) {
+      const dt = (f.t - prevFix.t) / 1000;
+      if (dt >= 0.5) {
+        z = haversine(prevFix, f) / dt;
+        const e = Math.hypot(prevFix.acc || 10, f.acc || 10) / dt; r = e * e;
+      }
+    }
+    if (f.lat != null) prevFix = f;
+    if (z === null || z > MAX_SPEED) return;
+    state.est = kf.update(z, r, f.t);
+    if (state.mode === "gps") setStatus("ok", "GPS · ±" + Math.round(f.acc || 0) + " m");
+  }
+
+  // ---------- Sources ----------
+  class GpsSource {
+    start(onFix, onErr) {
+      if (!("geolocation" in navigator)) return onErr(1, "This browser has no location support.");
+      try {
+        this.id = navigator.geolocation.watchPosition(
+          p => onFix({ t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed }),
+          e => onErr(e.code, e.code === 1 ? "Location permission was refused." : e.code === 3 ? "Still waiting for a GPS fix." : "Position unavailable. Move to open sky."),
+          { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
+      } catch (err) { onErr(1, "Location is blocked here."); }
+    }
+    stop() { if (this.id != null) { try { navigator.geolocation.clearWatch(this.id); } catch {} } this.id = null; }
+  }
+
+  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+  class SimSource {
+    constructor() {
+      // target m/s, accel, brake, hold seconds
+      this.plan = [
+        { v: 0, a: 2, b: 3, hold: 3 }, { v: 13.9, a: 2.6, b: 3, hold: 7 }, { v: 0, a: 2, b: 3.2, hold: 3 },
+        { v: 27.8, a: 2.3, b: 2, hold: 6 }, { v: 32.5, a: 1.1, b: 2, hold: 6 }, { v: 25, a: 2, b: 1.6, hold: 5 },
+        { v: 8.3, a: 2, b: 2.4, hold: 4 }, { v: 0, a: 2, b: 2.8, hold: 2 }
+      ];
+    }
+    start(onFix) {
+      this.v = 0; this.i = 0; this.hold = 0; this.last = performance.now();
+      this.timer = setInterval(() => {
+        const now = performance.now(), dt = Math.min((now - this.last) / 1000, 2); this.last = now;
+        this.step(dt);
+        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4, lat: null, lon: null });
+      }, 500);
+    }
+    step(dt) {
+      const s = this.plan[this.i], diff = s.v - this.v;
+      if (Math.abs(diff) < 0.15) {
+        this.v = s.v; this.hold += dt;
+        if (this.hold >= s.hold) { this.i = (this.i + 1) % this.plan.length; this.hold = 0; }
+      } else {
+        const rate = diff > 0 ? s.a : s.b;
+        this.v += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
+      }
+    }
+    stop() { clearInterval(this.timer); }
+  }
+
+  let source = null;
+  function useSource(mode) {
+    if (source) source.stop();
+    kf.reset(); prevFix = null; state.est = 0;
+    state.mode = mode;
+    $("#modeSim").setAttribute("aria-pressed", mode === "sim");
+    $("#modeGps").setAttribute("aria-pressed", mode === "gps");
+    if (mode === "sim") {
+      source = new SimSource(); source.start(onFix);
+      setStatus("sim", "Simulated drive · 2 Hz");
+    } else {
+      source = new GpsSource();
+      setStatus("wait", "Waiting for GPS fix");
+      source.start(onFix, (code, msg) => {
+        if (code === 1) {
+          $("#note").textContent = msg + " Showing the simulator instead. Host the file on HTTPS and allow location to use real GPS.";
+          useSource("sim");
+          setStatus("bad", "Location blocked · simulator");
+        } else setStatus("wait", msg);
+      });
+    }
+  }
+
+  function setStatus(s, text) { $("#status").dataset.s = s; $("#statusText").textContent = text; }
+
+  // ---------- Theme tokens for canvas ----------
+  let T = {};
+  function readTokens() {
+    const cs = getComputedStyle(document.documentElement);
+    ["ink", "muted", "line", "accent", "alert", "needle", "face", "panel", "alert-soft", "accent-soft"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
+  }
+  readTokens();
+  matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", readTokens);
+  new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
+
+  // ---------- HiDPI canvases ----------
+  function hidpi(canvas) {
+    const o = { canvas, ctx: canvas.getContext("2d"), w: 0, h: 0, dpr: 1 };
+    const fit = () => {
+      const r = canvas.getBoundingClientRect();
+      o.dpr = Math.min(window.devicePixelRatio || 1, 3); o.w = r.width; o.h = r.height;
+      canvas.width = Math.round(r.width * o.dpr); canvas.height = Math.round(r.height * o.dpr);
+    };
+    new ResizeObserver(fit).observe(canvas); fit();
+    return o;
+  }
+  const G = hidpi($("#gauge")), S = hidpi($("#spark"));
+
+  // ---------- Gauge ----------
+  const A0 = 0.75 * Math.PI, SWEEP = 1.5 * Math.PI;
+  function drawGauge() {
+    const { ctx, w, h, dpr } = G; if (!w) return;
+    const U = UNITS[state.unit];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 6;
+    const ang = v => A0 + SWEEP * Math.min(Math.max(v / U.max, 0), 1);
+    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
+
+    // face
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = T.face; ctx.fill();
+    ctx.lineWidth = 1; ctx.strokeStyle = T.line; ctx.stroke();
+
+    const rr = R * 0.86, bw = Math.max(6, R * 0.05);
+    ctx.lineCap = "butt";
+    ctx.lineWidth = bw; ctx.strokeStyle = T.line;
+    ctx.beginPath(); ctx.arc(cx, cy, rr, A0, A0 + SWEEP); ctx.stroke();
+    if (limU < U.max) {
+      ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke();
+    }
+    if (shownU > 0.05) {
+      ctx.strokeStyle = shownU > limU ? T.alert : T.accent;
+      ctx.beginPath(); ctx.arc(cx, cy, rr, A0, ang(shownU)); ctx.stroke();
+    }
+
+    // ticks
+    const tickOut = rr - bw / 2 - 4;
+    ctx.fillStyle = T.muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const fs = Math.max(11, R * 0.085);
+    ctx.font = `600 ${fs}px "Saira Condensed", "Arial Narrow", sans-serif`;
+    for (let v = 0; v <= U.max + 1e-6; v += U.minor) {
+      const a = ang(v), major = Math.abs(v / U.major - Math.round(v / U.major)) < 1e-6;
+      const len = major ? R * 0.09 : R * 0.04;
+      ctx.lineWidth = major ? 2 : 1;
+      ctx.strokeStyle = v >= limU ? T.alert : (major ? T.ink : T.muted);
+      ctx.beginPath();
+      ctx.moveTo(cx + Math.cos(a) * tickOut, cy + Math.sin(a) * tickOut);
+      ctx.lineTo(cx + Math.cos(a) * (tickOut - len), cy + Math.sin(a) * (tickOut - len));
+      ctx.stroke();
+      if (major) {
+        const lr = tickOut - len - fs * 0.95;
+        ctx.fillStyle = v >= limU ? T.alert : T.ink;
+        ctx.fillText(String(v), cx + Math.cos(a) * lr, cy + Math.sin(a) * lr);
+      }
+    }
+
+    // limit marker
+    if (limU < U.max) {
+      const a = ang(limU);
+      ctx.fillStyle = T.alert;
+      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (rr + bw), cy + Math.sin(a) * (rr + bw), Math.max(3, R * 0.018), 0, Math.PI * 2); ctx.fill();
+    }
+
+    // needle
+    const a = ang(shownU), nl = R * 0.74;
+    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.fillStyle = T.needle;
+    ctx.beginPath(); ctx.moveTo(-R * 0.12, -R * 0.018); ctx.lineTo(nl, -1.2); ctx.lineTo(nl, 1.2); ctx.lineTo(-R * 0.12, R * 0.018); ctx.closePath(); ctx.fill();
+    ctx.restore();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.055, 0, Math.PI * 2); ctx.fillStyle = T.ink; ctx.fill();
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.022, 0, Math.PI * 2); ctx.fillStyle = T.needle; ctx.fill();
+  }
+
+  // ---------- Sparkline ----------
+  function drawSpark() {
+    const { ctx, w, h, dpr } = S; if (!w) return;
+    const U = UNITS[state.unit];
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    const N = 120, data = state.hist, pad = 6;
+    const top = Math.max(state.limitMs * 1.15, ...data, 5);
+    const x = i => pad + (w - 2 * pad) * (i + (N - data.length)) / (N - 1);
+    const y = v => h - pad - (h - 2 * pad) * v / top;
+    ctx.strokeStyle = T.line; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(pad, h - pad + .5); ctx.lineTo(w - pad, h - pad + .5); ctx.stroke();
+    ctx.setLineDash([4, 4]); ctx.strokeStyle = T.alert;
+    ctx.beginPath(); ctx.moveTo(pad, Math.round(y(state.limitMs)) + .5); ctx.lineTo(w - pad, Math.round(y(state.limitMs)) + .5); ctx.stroke();
+    ctx.setLineDash([]);
+    if (data.length < 2) return;
+    ctx.beginPath(); data.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+    ctx.lineTo(x(data.length - 1), h - pad); ctx.lineTo(x(0), h - pad); ctx.closePath();
+    ctx.fillStyle = T["accent-soft"]; ctx.fill();
+    ctx.beginPath(); data.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
+    ctx.strokeStyle = T.accent; ctx.lineWidth = 1.75; ctx.stroke();
+    const lv = data[data.length - 1];
+    ctx.beginPath(); ctx.arc(x(data.length - 1), y(lv), 3.5, 0, Math.PI * 2);
+    ctx.fillStyle = lv > state.limitMs ? T.alert : T.accent; ctx.fill();
+  }
+
+  // ---------- Audio ----------
+  let audioCtx = null, lastBeep = 0;
+  function beep() {
+    if (!audioCtx) return;
+    const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime;
+    o.frequency.value = 880; o.type = "sine";
+    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
+    o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.18);
+  }
+
+  // ---------- UI text ----------
+  const fmtTime = s => { s = Math.floor(s); const hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60; return (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
+  function updateText() {
+    const U = UNITS[state.unit], t = state.trip;
+    $("#speedNum").textContent = state.unit === "ms" ? (state.shown * U.f).toFixed(1) : Math.round(state.shown * U.f);
+    $("#tDist").textContent = (t.dist * U.df).toFixed(2);
+    $("#tTime").textContent = fmtTime(t.elapsed);
+    $("#tAvg").textContent = t.moving > 1 ? Math.round(t.dist / t.moving * U.f) : 0;
+    $("#tMax").textContent = Math.round(t.max * U.f);
+    $("#accText").textContent = state.acc != null ? "±" + Math.round(state.acc) + " m" : "±– m";
+  }
+  function applyUnit() {
+    const U = UNITS[state.unit];
+    $("#speedUnit").textContent = U.label;
+    document.querySelectorAll(".uLbl").forEach(e => e.textContent = U.label);
+    $("#tDistU").textContent = U.dist;
+    document.querySelectorAll("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.u === state.unit));
+    $("#limit").value = Math.round(state.limitMs * U.f);
+    $("#limit").step = state.unit === "ms" ? 1 : 5;
+  }
+
+  // ---------- Main loop ----------
+  let lastFrame = performance.now(), lastText = 0, lastSample = 0, lastAnnounce = 0;
+  function frame(now) {
+    const dt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
+    let target = state.est;
+    if (state.mode === "gps" && state.lastRecv && now - state.lastRecv > 5000) setStatus("bad", "Signal lost");
+
+    if (reduceMotion) { state.shown = target; state.vel = 0; }
+    else {
+      const w = 6, a = w * w * (target - state.shown) - 2 * w * state.vel;
+      state.vel += a * dt; state.shown = Math.max(0, state.shown + state.vel * dt);
+    }
+
+    const t = state.trip;
+    t.elapsed += dt;
+    if (state.est > 0.5) { t.dist += state.est * dt; t.moving += dt; }
+    t.max = Math.max(t.max, state.est);
+
+    if (now - lastSample > 500) { lastSample = now; state.hist.push(state.est); if (state.hist.length > 120) state.hist.shift(); }
+
+    const over = state.shown > state.limitMs + 0.05;
+    root.classList.toggle("over", over);
+    if (over && state.sound && now - lastBeep > 1500) { lastBeep = now; beep(); }
+
+    drawGauge();
+    if (now - lastText > 100) { lastText = now; updateText(); drawSpark(); }
+    if (now - lastAnnounce > 5000) { lastAnnounce = now; $("#live").textContent = $("#speedNum").textContent + " " + UNITS[state.unit].label + (over ? ", over limit" : ""); }
+    requestAnimationFrame(frame);
+  }
+
+  // ---------- Controls ----------
+  $("#modeSim").onclick = () => useSource("sim");
+  $("#modeGps").onclick = () => { $("#note").textContent = "Requesting location. Allow it in the browser prompt."; useSource("gps"); };
+  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => { state.unit = b.dataset.u; store.set("unit", state.unit); applyUnit(); });
+  function setLimit(vU) {
+    const U = UNITS[state.unit];
+    vU = Math.min(Math.max(Number(vU) || 0, 5), U.max);
+    state.limitMs = vU / U.f; store.set("limitMs", state.limitMs); $("#limit").value = Math.round(vU);
+  }
+  $("#limit").addEventListener("change", e => setLimit(e.target.value));
+  $("#limUp").onclick = () => setLimit(Number($("#limit").value) + Number($("#limit").step));
+  $("#limDown").onclick = () => setLimit(Number($("#limit").value) - Number($("#limit").step));
+  $("#resetTrip").onclick = () => { state.trip = { dist: 0, moving: 0, elapsed: 0, max: 0 }; state.hist = []; };
+  $("#soundBtn").onclick = e => {
+    state.sound = !state.sound; e.currentTarget.setAttribute("aria-pressed", state.sound);
+    e.currentTarget.textContent = state.sound ? "Chime on" : "Chime when over limit";
+    if (state.sound) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); beep(); } catch { state.sound = false; } }
+  };
+  let wakeLock = null;
+  async function requestWake() {
+    try { wakeLock = await navigator.wakeLock.request("screen"); return true; } catch { return false; }
+  }
+  $("#wakeBtn").onclick = async e => {
+    const btn = e.currentTarget;
+    if (wakeLock) { try { await wakeLock.release(); } catch {} wakeLock = null; btn.setAttribute("aria-pressed", "false"); btn.textContent = "Keep screen on"; return; }
+    if (await requestWake()) { btn.setAttribute("aria-pressed", "true"); btn.textContent = "Screen stays on"; }
+    else btn.textContent = "Not supported here";
+  };
+  document.addEventListener("visibilitychange", () => { if (wakeLock && document.visibilityState === "visible") requestWake(); });
+
+  applyUnit();
+  useSource("sim");
+  requestAnimationFrame(frame);
+})();
+</script>
+
+</body>
+</html>
