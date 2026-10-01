@@ -1,0 +1,188 @@
+[
+ {
+  "id": "R1",
+  "test": "Initial page load",
+  "pass": true,
+  "detail": "watchPosition calls on load: 0; card: 'Turn on location to start'"
+ },
+ {
+  "id": "R2",
+  "test": "Enable location (tapped 3x)",
+  "pass": true,
+  "detail": "active watchers: 1, state: 'Allow location'"
+ },
+ {
+  "id": "R2b",
+  "test": "First fix unlocks the speedometer",
+  "pass": true,
+  "detail": "speed '0'"
+ },
+ {
+  "id": "R1b",
+  "test": "Returning user (already allowed)",
+  "pass": true,
+  "detail": "started automatically, no card, status 'Finding GPS', speed '––'"
+ },
+ {
+  "id": "R3",
+  "test": "Denied permission",
+  "pass": true,
+  "detail": "'Location is blocked', 3 device-specific steps, watcher released"
+ },
+ {
+  "id": "R3b",
+  "test": "Previously denied: no prompt, recovery shown",
+  "pass": true,
+  "detail": "no watch started"
+ },
+ {
+  "id": "R0",
+  "test": "Before first fix: unavailable, not zero",
+  "pass": true,
+  "detail": "speed '––', trip '–– km'"
+ },
+ {
+  "id": "R6",
+  "test": "Stationary device",
+  "pass": true,
+  "detail": "shows 0, distance 0.00 m after 15 s of jitter"
+ },
+ {
+  "id": "R7",
+  "test": "Moving device (instant 0 → 90 km/h jump)",
+  "pass": true,
+  "detail": "86 km/h after 2 fixes; the first was held back as physically impossible (>1.2 g)"
+ },
+ {
+  "id": "R4",
+  "test": "GPS loss",
+  "pass": true,
+  "detail": "'––', 'Signal lost', screen reader: 'GPS signal lost'"
+ },
+ {
+  "id": "R5",
+  "test": "GPS recovery (12 s gap, 90 → 43 km/h)",
+  "pass": true,
+  "detail": "first reading after gap: 43 km/h"
+ },
+ {
+  "id": "A1",
+  "test": "Overspeed activates once; raising the limit clears it",
+  "pass": true,
+  "detail": "over=True, alerts=1, after limit 100→120: cleared=True"
+ },
+ {
+  "id": "A2",
+  "test": "Muted: red state but no sound/vibration",
+  "pass": true,
+  "detail": "alerts still 1"
+ },
+ {
+  "id": "A3",
+  "test": "GPS lost during overspeed clears it",
+  "pass": true,
+  "detail": "cleared, no stale overspeed"
+ },
+ {
+  "id": "R8",
+  "test": "Long GPS gap (65 s)",
+  "pass": true,
+  "detail": "distance added across the gap: 0 m (car moved ~1.3 km; gap > 60 s is not invented)"
+ },
+ {
+  "id": "R9",
+  "test": "Mode switching during recording",
+  "pass": true,
+  "detail": "4 points recorded across 4 mode switches (4 fixes)"
+ },
+ {
+  "id": "R11",
+  "test": "Navigation during recording",
+  "pass": true,
+  "detail": "4 points across 4 screen changes, REC indicator still shown"
+ },
+ {
+  "id": "R12",
+  "test": "Pause and resume",
+  "pass": true,
+  "detail": "while paused: +0.0 m, +0 points; after resume: +61 m for 3 s at 20 m/s"
+ },
+ {
+  "id": "R10",
+  "test": "Unit switching",
+  "pass": true,
+  "detail": "trip 820.0 m, top 30.00 m/s before and after 4 unit changes"
+ },
+ {
+  "id": "R14",
+  "test": "Browser refresh during recording",
+  "pass": true,
+  "detail": "recording restored with 14 points; toast: 'Recording resumed after reload'"
+ },
+ {
+  "id": "R18",
+  "test": "Export (GPX + CSV)",
+  "pass": true,
+  "detail": "GPX: valid XML, 17 points; CSV median speed 72.0 km/h (true 72)"
+ },
+ {
+  "id": "R18b",
+  "test": "Export: empty recording not saved",
+  "pass": true,
+  "detail": "Nothing was saved: no GPS points were recorded. Record while moving with a GPS signal."
+ },
+ {
+  "id": "R13",
+  "test": "Reset",
+  "pass": true,
+  "detail": "stored distance after reset: 0; after reload Trip shows '––' (no GPS yet)"
+ },
+ {
+  "id": "R15",
+  "test": "Storage failure",
+  "pass": true,
+  "detail": "message: 'Can't save to this phone's storage. Your trip keeps running, but it won't survive a reload.'; speed still live: 72"
+ },
+ {
+  "id": "R16",
+  "test": "Wake Lock denial",
+  "pass": true,
+  "detail": "switch off, explained; drive mode still works (72 km/h)"
+ },
+ {
+  "id": "R19",
+  "test": "Reduced motion",
+  "pass": true,
+  "detail": "display at 21 km/h 120 ms after a 11→22 km/h fix (filtered value; the eased needle would still be near 13); animations: none/0s"
+ },
+ {
+  "id": "R17",
+  "test": "Canvas resize",
+  "pass": true,
+  "detail": "358px→716px; 220px→440px; 398px→796px; 260px→520px; 358px→716px (square, DPR-scaled)"
+ },
+ {
+  "id": "R20p",
+  "test": "Layout small_360x640",
+  "pass": true,
+  "detail": "no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 220px"
+ },
+ {
+  "id": "R20p",
+  "test": "Layout iphone_390x844",
+  "pass": true,
+  "detail": "no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 358px"
+ },
+ {
+  "id": "R20",
+  "test": "Layout landscape_844x390",
+  "pass": true,
+  "detail": "no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 260px"
+ },
+ {
+  "id": "R20",
+  "test": "Layout landscape_667x375",
+  "pass": true,
+  "detail": "no sideways scroll, all controls visible above the tab bar, smallest target 44px, dial 245px"
+ }
+]

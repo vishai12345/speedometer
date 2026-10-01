@@ -1,0 +1,29 @@
+PASS  Stationary: speed reads 0                                    100.0% of fixes show 0
+PASS  Stationary: distance stays near 0                            0.00 m over 5 min (position-sum would be 2987 m)
+PASS  Stationary: no moving time                                   0.0 s
+PASS  Cruise 90 km/h: bias                                         -0.03 km/h
+PASS  Cruise 90 km/h: jitter                                       ±0.85 km/h (raw GPS noise ±0.90)
+PASS  Acceleration: filter lag                                     0.00 s behind true speed at 3 m/s²
+PASS  20-min drive: distance error (speed integration)             -0.04% of 20.73 km
+info  20-min drive: distance error (position sum, for comparison)  6.79%
+PASS  20-min drive: moving time                                    1073 s vs 1068 s true
+PASS  Tunnel: no stale speed shown during loss                     status 'lost', speed hidden
+PASS  Tunnel: distance bridged across 25 s gap                     -0.60%
+PASS  Single bad reading (+65 km/h spike)                          displayed moved -1.9 km/h
+PASS  No Doppler speed: fallback works                             bias 1.23 km/h, jitter ±2.77 km/h
+PASS  No Doppler speed: flagged as poor                            status 'poor'
+PASS  Duplicate / out-of-order / cached fixes rejected             duplicate, duplicate, stale
+PASS  Before first fix: speed is unknown, not 0                    status 'acquiring', speed null
+PASS  0-100 km/h timing (1 Hz GPS)                                 9.25 s vs 9.26 s true, reliable
+PASS  0-100 with a GPS gap is flagged rough                        9.18 s, rough
+PASS  Hovering ±1 km/h around the limit                            1 alert(s) in 60 s
+PASS  Sustained overspeed repeats gently                           2 alerts in 65 s (first after 1.5 s, then once a minute)
+PASS  Signal lost clears overspeed                                 cleared
+PASS  Tolerance respected (+4% under +5% tolerance)                no alert
+PASS  Long gap (3 min): estimator restarts on fresh data           first speed after gap 34.2 km/h (true 36, before gap 72)
+PASS  Long gap (3 min): no distance or moving time invented        0.9 m beyond the post-gap driving, moving +59 s for 60 s of post-gap driving
+PASS  Parked + 2 min in background: no distance                    0.00 m
+PASS  30 s gap: bridged, no speed jump on recovery                 distance -2.80%, first speed 66.7 km/h (true 64.8)
+PASS  Distance independent of how often the UI reads it            1805.259 m both ways
+
+26 passed, 0 failed

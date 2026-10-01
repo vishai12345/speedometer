@@ -27,6 +27,7 @@
     maxIntegrateGap: 5,   // s      integrate speed over gaps up to this long
     maxBridgeGap: 60,     // s      bridge longer gaps with straight-line distance between good fixes
     maxElapsedStep: 60,   // s      cap on elapsed time added for a single gap
+    resetGap: 10,         // s      after a gap longer than this the speed estimate is discarded and re-initialised
     launchStill: 0.8,     // m/s    raw readings below this count as standing still (GPS noise at rest)
     launchMove: 1.2,      // m/s    a raw reading above this means the launch has begun
     launchArm: 1.5,       // s      must be stationary this long before a launch can be timed
@@ -193,9 +194,14 @@
 
       if (z === null) { if (hasPos && acc !== null && acc <= c.maxDerivedAcc) this.lastPos = { t: fix.t, lat: fix.lat, lon: fix.lon, acc }; return { ok: false, reason: "no-speed", src }; }
 
-      // ---- outlier handling: innovation gate + physical plausibility ----
       const prevA = this.lastAccepted;
-      if (prevA) {
+      // ---- long gap: the old estimate says nothing about the present, so start the filter fresh ----
+      if (prevA && (fix.t - prevA.t) / 1000 > c.resetGap) {
+        this.kf.reset(); this._suspect = 0; this._votes = 0; this.moving = false; this.accel = 0;
+        this.resets = (this.resets || 0) + 1;
+      }
+      // ---- outlier handling: innovation gate + physical plausibility ----
+      if (prevA && this.kf.t !== null) {
         const dt = Math.max((fix.t - prevA.t) / 1000, 0.001);
         const S = Math.sqrt(this.kf.predictVar(fix.t) + r);
         const jump = Math.abs(z - this.kf.x);
@@ -228,7 +234,7 @@
           d = straight > Math.hypot(acc, prevA.pos.acc) ? straight : 0;
         }
         this.trip.dist += d;
-        if (d > 0 || this.moving) this.trip.moving += Math.min(dt, c.maxBridgeGap);
+        if (d > 0 || (this.moving && dt <= c.maxIntegrateGap)) this.trip.moving += Math.min(dt, c.maxBridgeGap);
         this.trip.elapsed += Math.min(dt, c.maxElapsedStep);
         if (this.moving && dt <= c.maxIntegrateGap) {
           const bin = Math.min(90, Math.floor(shown));

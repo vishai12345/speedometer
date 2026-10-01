@@ -1,5 +1,7 @@
 # Review response: Pacer v3.0
 
+> Superseded in part by [`VERIFICATION.md`](VERIFICATION.md) (v3.1), which covers the third review with full test evidence.
+
 A response to the independent v2.0 review: what was kept, what changed and why, how it was tested, and what is still unverified.
 
 ## Audit of v2.0
@@ -41,11 +43,11 @@ A response to the independent v2.0 review: what was kept, what changed and why, 
 
 **Persistence.** Trip totals and any in-progress recording are saved every 10 s and on `pagehide`/`visibilitychange`, and restored on load. Recording supports pause/resume; paused time and distance are excluded.
 
-**Permission flow — deliberate deviation.** The review recommends a user-initiated GPS start. The product owner explicitly asked for GPS to start on page load, so Pacer requests location immediately and shows an explanation card alongside the browser prompt. If permission is already granted there is no card at all. This is a product decision that can be flipped by removing the `startGps()` call from `bootLocation()` for the `prompt` state.
+**Permission flow (updated in v3.1).** Hybrid, chosen by the product owner after the third review: GPS starts on load only when location permission is already granted (no prompt can appear). Otherwise nothing starts until the user taps *Enable location*. See `VERIFICATION.md` §2.1.
 
 ## Test results
 
-`node tests/engine.test.js` — 21/21 pass (synthetic 1 Hz traces, Doppler noise σ 0.25 m/s, position noise σ 3–6 m).
+`node tests/engine.test.js` — 21/21 pass at v3.0 (26/26 at v3.1) (synthetic 1 Hz traces, Doppler noise σ 0.25 m/s, position noise σ 3–6 m).
 
 | Scenario | Result |
 |---|---|
@@ -60,7 +62,7 @@ A response to the independent v2.0 review: what was kept, what changed and why, 
 | 0–100, true 9.26 s | 9.25 s reliable; with 2.5 s gap: flagged rough |
 | Hovering ±1 km/h at limit | 1 alert in 60 s |
 
-`python3 tests/ui_scenarios.py` — 22/22 pass in Chromium with an injected fake GPS: first launch, denied + recovery, acquisition, stationary, moving, poor reception, interruption and recovery, overspeed (single alert, no repeat near the limit, clears), recording across a page reload, trip totals across reload, GPX/CSV validity, HUD mirroring, night theme, 320×568, 844×390 landscape and 1024×768 layouts.
+`python3 tests/ui_scenarios.py` — 22/22 pass at v3.0 (31/31 at v3.1, rewritten around the mandatory regression list) in Chromium with an injected fake GPS: first launch, denied + recovery, acquisition, stationary, moving, poor reception, interruption and recovery, overspeed (single alert, no repeat near the limit, clears), recording across a page reload, trip totals across reload, GPX/CSV validity, HUD mirroring, night theme, 320×568, 844×390 landscape and 1024×768 layouts.
 
 ## Not yet verified
 

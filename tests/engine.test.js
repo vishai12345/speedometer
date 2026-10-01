@@ -178,6 +178,48 @@ function check(name, cond, detail) { results.push({ name, pass: !!cond, detail }
   check("Tolerance respected (+4% under +5% tolerance)", !r4.over, "no alert");
 }
 
+// ---------- 11. Long gap: estimator reset, no unbounded integration ----------
+{
+  // 20 m/s, then a 3-minute gap (backgrounded / no GPS), car is doing 10 m/s when fixes resume
+  const prof = t => t < 60 ? 20 : 10;
+  const tr = makeTrace(prof, { dur: 300, drop: [[60, 240]] });
+  const e = new Engine(); e.start();
+  let distBefore = null, movingBefore = null, firstAfter = null;
+  for (const f of tr.fixes) {
+    const tt = (f.t - tr.T0) / 1000;
+    if (tt >= 240 && distBefore === null) { distBefore = e.trip.dist; movingBefore = e.trip.moving; }
+    e.ingest(f, f.t + 150);
+    if (tt >= 240 && firstAfter === null) firstAfter = e.speed(f.t + 150);
+  }
+  check("Long gap (3 min): estimator restarts on fresh data", e.resets === 1 && Math.abs(firstAfter - 10) < 1.5, `first speed after gap ${(firstAfter * 3.6).toFixed(1)} km/h (true 36, before gap 72)`);
+  const gapDist = e.trip.dist - distBefore - 59 * 10;  // after-gap fixes contribute ~59 s x 10 m/s
+  check("Long gap (3 min): no distance or moving time invented", Math.abs(gapDist) < 15 && e.trip.moving - movingBefore < 62, `${gapDist.toFixed(1)} m beyond the post-gap driving, moving +${(e.trip.moving - movingBefore).toFixed(0)} s for 60 s of post-gap driving`);
+}
+{
+  // parked phone, page backgrounded for 2 minutes
+  const tr = makeTrace(() => 0, { dur: 240, posNoise: 6, acc: 10, drop: [[60, 180]] });
+  const { e } = run(tr);
+  check("Parked + 2 min in background: no distance", e.trip.dist < 2, `${e.trip.dist.toFixed(2)} m`);
+}
+{
+  // 30 s gap is bridged by the straight line, and speed is right on the first fix after it
+  const tr = makeTrace(() => 18, { dur: 120, drop: [[40, 70]] });
+  const e = new Engine(); e.start(); let first = null;
+  for (const f of tr.fixes) { e.ingest(f, f.t + 150); if ((f.t - tr.T0) / 1000 >= 70 && first === null) first = e.speed(f.t + 150); }
+  const err = (e.trip.dist - tr.totalDist) / tr.totalDist;
+  check("30 s gap: bridged, no speed jump on recovery", Math.abs(err) < 0.03 && Math.abs(first - 18) < 1, `distance ${(err * 100).toFixed(2)}%, first speed ${(first * 3.6).toFixed(1)} km/h (true 64.8)`);
+}
+
+// ---------- 12. Frame-rate independence (engine has no clock of its own) ----------
+{
+  const tr = makeTrace(t => 15 + 5 * Math.sin(t / 10), { dur: 120 });
+  const a = run(tr).e.trip.dist;
+  // same fixes, but with status/speed polled 1000 times between fixes, as a fast render loop would
+  const e = new Engine(); e.start();
+  for (const f of tr.fixes) { e.ingest(f, f.t + 150); for (let k = 0; k < 1000; k++) e.speed(f.t + 150 + k); }
+  check("Distance independent of how often the UI reads it", Math.abs(e.trip.dist - a) < 1e-9, `${a.toFixed(3)} m both ways`);
+}
+
 // ---------- report ----------
 const w = Math.max(...results.map(r => r.name.length));
 let failed = 0;
