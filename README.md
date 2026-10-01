@@ -11,6 +11,8 @@ A GPS speedometer that runs in the browser: Kalman-filtered speed, a 60 fps dial
 
 **Display styles:** Classic needle dial, Sport LED arc, large Digital readout, and HUD (mirrorable for windshield reflection at night). **Drive mode** shows only the dial, full screen, with the screen kept on.
 
+**Also included:** compass heading, altitude, G meter, automatic 0–100 km/h (0–60 mph) timer, trip recording with GPX/CSV export, chime + vibration speed alerts, green/amber/red speed zones, a top-speed marker on the dial, knots, and Auto/Day/Night themes.
+
 The **Simulator** mode replays a test drive, so you can try the app without moving.
 
 ## Deploy

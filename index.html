@@ -68,6 +68,23 @@ button,input{font:inherit;color:inherit}
 .over .readout .v{color:var(--alert)}
 .flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
 .over .flag{visibility:visible;animation:pulse .9s infinite}
+.warn .readout .v{color:var(--accent)}
+body{transition:background-color .3s,color .3s}
+.btn,.seg button{transition:background-color .15s,color .15s,box-shadow .15s,border-color .15s}
+.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;max-width:440px}
+@media (max-width:480px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.chip{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.chip .k{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chip .n{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
+.arw{width:12px;height:12px;fill:var(--accent);transition:transform .4s ease;flex:none}
+.trips{list-style:none;padding:0;margin:0}
+.trips li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:10px 0}
+.trips li > div:first-child{min-width:0}
+.trips strong{display:block;font-size:14px}
+.trips span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:6px}
+.btn.sm{padding:4px 9px;font-size:12px}
+.btn.rec{background:var(--alert);border-color:var(--alert);color:var(--panel)}
 /* display styles */
 .dial[data-style="sport"] .readout{top:38%}
 .dial[data-style="digital"] .readout{top:10%}
@@ -141,7 +158,7 @@ ul{padding-left:20px}
 <div class="wrap" id="app">
   <header class="top">
     <div>
-      <div class="eyebrow">Web instrument · v1.1</div>
+      <div class="eyebrow">Web instrument · v1.2</div>
       <h1>Pacer Speedometer</h1>
       <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and an overspeed alert. Opens on a simulated drive so you can see it working right away.</p>
     </div>
@@ -158,6 +175,12 @@ ul{padding-left:20px}
           <span class="flag">Over limit</span>
         </div>
       </div>
+      <div class="strip">
+        <div class="chip"><span class="k">Heading</span><span class="n"><svg class="arw" id="arw" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0L9 10L5 7.6L1 10z"/></svg><span id="iHdg">—</span></span></div>
+        <div class="chip"><span class="k">Altitude</span><span class="n" id="iAlt">—</span></div>
+        <div class="chip"><span class="k">Accel</span><span class="n" id="iG">0.00 g</span></div>
+        <div class="chip"><span class="k" id="iLaunchK">0–100 km/h</span><span class="n" id="iLaunch">—</span></div>
+      </div>
       <div class="sr" id="live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div>
       <div class="row" style="justify-content:center">
         <div class="seg" role="group" aria-label="Speed source">
@@ -168,6 +191,7 @@ ul{padding-left:20px}
           <button data-u="kmh" aria-pressed="true">km/h</button>
           <button data-u="mph" aria-pressed="false">mph</button>
           <button data-u="ms" aria-pressed="false">m/s</button>
+          <button data-u="kn" aria-pressed="false">kn</button>
         </div>
       </div>
       <div class="row" style="justify-content:center">
@@ -201,6 +225,15 @@ ul{padding-left:20px}
       </div>
 
       <div class="panel">
+        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+          <div class="eyebrow">Trip log</div>
+          <button class="btn primary" id="recBtn" aria-pressed="false">Start recording</button>
+        </div>
+        <p class="muted" id="recInfo" style="font-size:13px;margin:0 0 6px">Record a drive to save its route and stats on this phone, then export it as GPX for maps or CSV for spreadsheets.</p>
+        <ul class="trips" id="trips"></ul>
+      </div>
+
+      <div class="panel">
         <div class="eyebrow" style="margin-bottom:12px">Alerts &amp; device</div>
         <div class="ctl">
           <label for="limit">Speed limit</label>
@@ -210,7 +243,13 @@ ul{padding-left:20px}
             <button id="limUp" aria-label="Raise limit">+</button>
           </div>
           <label for="soundBtn">Chime</label>
-          <div><button class="btn" id="soundBtn" aria-pressed="false">Chime when over limit</button></div>
+          <div><button class="btn" id="soundBtn" aria-pressed="false">Chime &amp; vibrate over limit</button></div>
+          <label>Theme</label>
+          <div class="seg" role="group" aria-label="Theme" id="themeSeg">
+            <button data-th="auto" aria-pressed="true">Auto</button>
+            <button data-th="light" aria-pressed="false">Day</button>
+            <button data-th="dark" aria-pressed="false">Night</button>
+          </div>
           <label for="wakeBtn">Screen</label>
           <div><button class="btn" id="wakeBtn" aria-pressed="false">Keep screen on</button></div>
         </div>
@@ -245,6 +284,10 @@ ul{padding-left:20px}
       <tr><td>Alert engine</td><td>Compares speed to the limit; drives the red state and the chime</td><td>Web Audio</td></tr>
       <tr><td>Display styles</td><td>Classic needle dial, Sport LED arc, large Digital readout and a mirrored windshield HUD, all fed by the same state</td><td>Canvas 2D</td></tr>
       <tr><td>Drive mode</td><td>Hides everything except the dial, goes full screen and keeps the screen on</td><td>Fullscreen, Screen Wake Lock</td></tr>
+      <tr><td>Heading &amp; altitude</td><td>Compass heading from GPS course (or bearing between fixes) and altitude above sea level</td><td><code>coords.heading</code>, <code>coords.altitude</code></td></tr>
+      <tr><td>G meter &amp; 0–100 timer</td><td>Longitudinal acceleration from the filtered speed; automatic launch timer from standstill to 100 km/h (60 mph)</td><td>—</td></tr>
+      <tr><td>Trip log</td><td>Records route points, saves up to 15 trips on the phone and exports GPX or CSV</td><td><code>localStorage</code>, Blob downloads</td></tr>
+      <tr><td>Themes</td><td>Auto, Day and Night palettes with green/amber/red speed zones for at-a-glance reading</td><td>CSS tokens</td></tr>
       <tr><td>Gauge renderer</td><td>Draws the dial, ticks, limit band and spring-damped needle on a HiDPI canvas</td><td>Canvas 2D, <code>requestAnimationFrame</code></td></tr>
       <tr><td>Settings store</td><td>Remembers units and the limit on this device</td><td><code>localStorage</code></td></tr>
       <tr><td>Wake lock</td><td>Stops the phone screen dimming while driving</td><td>Screen Wake Lock</td></tr>
@@ -382,7 +425,8 @@ v += acc * dt; x += v * dt;</code></pre></li>
   const UNITS = {
     kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km", df: 0.001 },
     mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi", df: 0.000621371 },
-    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km", df: 0.001 }
+    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km", df: 0.001 },
+    kn:  { label: "kn",   f: 1.943844, max: 140, major: 20, minor: 5,   dist: "nmi", df: 0.000539957 }
   };
 
   // ---------- Settings store ----------
@@ -400,7 +444,9 @@ v += acc * dt; x += v * dt;</code></pre></li>
     est: 0, shown: 0, vel: 0,
     lastRecv: 0, acc: null,
     trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
-    hist: [], sound: false
+    hist: [], sound: false,
+    hdg: null, alt: null, accel: 0, lastEst: 0, lastEstT: 0,
+    launch: { armed: false, t0: null, last: null, best: null }
   };
 
   // ---------- Estimator ----------
@@ -427,6 +473,29 @@ v += acc * dt; x += v * dt;</code></pre></li>
     return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
 
+  function bearing(a, b) {
+    const φ1 = toRad(a.lat), φ2 = toRad(b.lat), dλ = toRad(b.lon - a.lon);
+    const y = Math.sin(dλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
+    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  }
+  const compass = h => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(h / 45) % 8];
+
+  // Trip recorder
+  const rec = { on: false, points: [], start: 0, trip0: null };
+  function afterEstimate(f) {
+    const dt = state.lastEstT ? (f.t - state.lastEstT) / 1000 : 0;
+    if (dt > 0.05 && dt < 5) state.accel += 0.5 * ((state.est - state.lastEst) / dt - state.accel);
+    state.lastEst = state.est; state.lastEstT = f.t;
+    const L = state.launch, target = state.unit === "mph" ? 26.8224 : 27.7778;
+    if (state.est < 0.5) { L.armed = true; L.t0 = null; }
+    else if (L.armed && L.t0 === null) L.t0 = f.t;
+    if (L.armed && L.t0 !== null) {
+      if (state.est >= target) { L.last = (f.t - L.t0) / 1000; L.best = L.best ? Math.min(L.best, L.last) : L.last; L.armed = false; L.t0 = null; }
+      else if (f.t - L.t0 > 60000) { L.armed = false; L.t0 = null; }
+    }
+    if (rec.on && f.lat != null) rec.points.push([f.t, +f.lat.toFixed(6), +f.lon.toFixed(6), Number.isFinite(f.alt) ? Math.round(f.alt * 10) / 10 : null, Math.round(state.est * 100) / 100]);
+  }
+
   const MAX_ACC = 50, MAX_SPEED = 90;
   let prevFix = null;
   function onFix(f) {
@@ -443,9 +512,15 @@ v += acc * dt; x += v * dt;</code></pre></li>
         const e = Math.hypot(prevFix.acc || 10, f.acc || 10) / dt; r = e * e;
       }
     }
+    if (f.lat != null) {
+      if (Number.isFinite(f.heading) && (f.speed == null || f.speed > 0.8)) state.hdg = f.heading;
+      else if (prevFix && haversine(prevFix, f) > 5) state.hdg = bearing(prevFix, f);
+    }
+    if (Number.isFinite(f.alt)) state.alt = f.alt;
     if (f.lat != null) prevFix = f;
     if (z === null || z > MAX_SPEED) return;
     state.est = kf.update(z, r, f.t);
+    afterEstimate(f);
     if (state.mode === "gps") setStatus("ok", "GPS · ±" + Math.round(f.acc || 0) + " m");
   }
 
@@ -455,7 +530,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
       if (!("geolocation" in navigator)) return onErr(1, "This browser has no location support.");
       try {
         this.id = navigator.geolocation.watchPosition(
-          p => onFix({ t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed }),
+          p => onFix({ t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading, alt: p.coords.altitude }),
           e => onErr(e.code, e.code === 1 ? "Location permission was refused." : e.code === 3 ? "Still waiting for a GPS fix." : "Position unavailable. Move to open sky."),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
       } catch (err) { onErr(1, "Location is blocked here."); }
@@ -475,13 +550,20 @@ v += acc * dt; x += v * dt;</code></pre></li>
     }
     start(onFix) {
       this.v = 0; this.i = 0; this.hold = 0; this.last = performance.now();
+      this.lat = 12.9716; this.lon = 77.5946; this.hdg = 35; this.alt = 905; this.clock = 0;
       this.timer = setInterval(() => {
         const now = performance.now(), dt = Math.min((now - this.last) / 1000, 2); this.last = now;
         this.step(dt);
-        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4, lat: null, lon: null });
+        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4, lat: this.lat, lon: this.lon, heading: this.v > 0.8 ? this.hdg : NaN, alt: this.alt + gauss() * 0.8 });
       }, 500);
     }
     step(dt) {
+      this.clock += dt;
+      this.hdg = (this.hdg + Math.sin(this.clock / 7) * 9 * dt * Math.min(this.v / 5, 1) + 360) % 360;
+      const d = this.v * dt;
+      this.lat += d * Math.cos(toRad(this.hdg)) / 111320;
+      this.lon += d * Math.sin(toRad(this.hdg)) / (111320 * Math.cos(toRad(this.lat)));
+      this.alt = 905 + 14 * Math.sin(this.clock / 45);
       const s = this.plan[this.i], diff = s.v - this.v;
       if (Math.abs(diff) < 0.15) {
         this.v = s.v; this.hold += dt;
@@ -553,7 +635,9 @@ v += acc * dt; x += v * dt;</code></pre></li>
     const shownU = state.shown * U.f, limU = state.limitMs * U.f;
 
     // face
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = T.face; ctx.fill();
+    const fg = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
+    fg.addColorStop(0, T.panel); fg.addColorStop(1, T.face);
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = fg; ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = T.line; ctx.stroke();
 
     const rr = R * 0.86, bw = Math.max(6, R * 0.05);
@@ -564,8 +648,24 @@ v += acc * dt; x += v * dt;</code></pre></li>
       ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke();
     }
     if (shownU > 0.05) {
-      ctx.strokeStyle = shownU > limU ? T.alert : T.accent;
+      let stroke = shownU > limU ? T.alert : T.accent;
+      if (ctx.createConicGradient) {
+        const cg = ctx.createConicGradient(A0, cx, cy), q = v => Math.min(Math.max(v / U.max, 0), 1) * 0.75;
+        cg.addColorStop(0, T.ok); cg.addColorStop(q(limU * 0.75), T.ok); cg.addColorStop(q(limU * 0.9), T.accent);
+        cg.addColorStop(q(limU), T.alert); cg.addColorStop(1, T.alert);
+        stroke = cg;
+      }
+      ctx.save();
+      ctx.shadowColor = shownU > limU ? T.alert : T.accent; ctx.shadowBlur = R * 0.06;
+      ctx.strokeStyle = stroke; ctx.lineCap = "round";
       ctx.beginPath(); ctx.arc(cx, cy, rr, A0, ang(shownU)); ctx.stroke();
+      ctx.restore();
+    }
+    if (state.trip.max * U.f > 1) {
+      const am = ang(state.trip.max * U.f);
+      ctx.save(); ctx.translate(cx + Math.cos(am) * (rr + bw), cy + Math.sin(am) * (rr + bw)); ctx.rotate(am);
+      ctx.fillStyle = T.muted; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 0.045, -R * 0.025); ctx.lineTo(R * 0.045, R * 0.025); ctx.closePath(); ctx.fill();
+      ctx.restore();
     }
 
     // ticks
@@ -599,6 +699,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     // needle
     const a = ang(shownU), nl = R * 0.74;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
+    ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = R * 0.03; ctx.shadowOffsetY = R * 0.008;
     ctx.fillStyle = T.needle;
     ctx.beginPath(); ctx.moveTo(-R * 0.12, -R * 0.018); ctx.lineTo(nl, -1.2); ctx.lineTo(nl, 1.2); ctx.lineTo(-R * 0.12, R * 0.018); ctx.closePath(); ctx.fill();
     ctx.restore();
@@ -721,6 +822,16 @@ v += acc * dt; x += v * dt;</code></pre></li>
     $("#tTime").textContent = fmtTime(t.elapsed);
     $("#tAvg").textContent = t.moving > 1 ? Math.round(t.dist / t.moving * U.f) : 0;
     $("#tMax").textContent = Math.round(t.max * U.f);
+    const imp = state.unit === "mph";
+    if (state.hdg != null && state.est > 0.8) { $("#iHdg").textContent = compass(state.hdg) + " " + Math.round(state.hdg) + "°"; $("#arw").style.transform = `rotate(${Math.round(state.hdg)}deg)`; }
+    else $("#iHdg").textContent = "—";
+    $("#iAlt").textContent = state.alt == null ? "—" : Math.round(imp ? state.alt * 3.28084 : state.alt) + (imp ? " ft" : " m");
+    $("#iG").textContent = (state.accel >= 0 ? "+" : "−") + Math.abs(state.accel / 9.81).toFixed(2) + " g";
+    const L = state.launch;
+    $("#iLaunchK").textContent = imp ? "0–60 mph" : "0–100 km/h";
+    $("#iLaunch").textContent = L.t0 !== null ? ((Date.now() - L.t0) / 1000).toFixed(1) + " s" : L.last ? L.last.toFixed(1) + " s" : L.armed ? "Ready" : "—";
+    $("#iLaunch").title = L.best ? "Best " + L.best.toFixed(1) + " s" : "";
+    if (rec.on) $("#recInfo").textContent = "Recording · " + fmtTime((Date.now() - rec.start) / 1000) + " · " + rec.points.length + " points";
     $("#accText").textContent = state.acc != null ? "±" + Math.round(state.acc) + " m" : "±– m";
   }
   function applyUnit() {
@@ -755,7 +866,8 @@ v += acc * dt; x += v * dt;</code></pre></li>
 
     const over = state.shown > state.limitMs + 0.05;
     root.classList.toggle("over", over);
-    if (over && state.sound && now - lastBeep > 1500) { lastBeep = now; beep(); }
+    root.classList.toggle("warn", !over && state.shown >= state.limitMs * 0.9 && state.shown > 1);
+    if (over && state.sound && now - lastBeep > 1500) { lastBeep = now; beep(); try { navigator.vibrate?.([120, 80, 120]); } catch {} }
 
     drawGauge();
     if (now - lastText > 100) { lastText = now; updateText(); drawSpark(); }
@@ -766,7 +878,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
   // ---------- Controls ----------
   $("#modeSim").onclick = () => useSource("sim");
   $("#modeGps").onclick = () => { $("#note").textContent = "Requesting location. Allow it in the browser prompt."; useSource("gps"); };
-  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => { state.unit = b.dataset.u; store.set("unit", state.unit); applyUnit(); });
+  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => { state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips(); });
   function setLimit(vU) {
     const U = UNITS[state.unit];
     vU = Math.min(Math.max(Number(vU) || 0, 5), U.max);
@@ -822,7 +934,71 @@ v += acc * dt; x += v * dt;</code></pre></li>
   $("#driveBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("drive")) setDrive(false); });
 
+  // ---------- Trip log ----------
+  const loadTrips = () => { const a = store.get("trips", []); return Array.isArray(a) ? a : []; };
+  function renderTrips() {
+    const U = UNITS[state.unit], list = $("#trips"), trips = loadTrips();
+    if (!trips.length) { list.innerHTML = '<li><span>No trips saved yet.</span></li>'; return; }
+    list.innerHTML = trips.slice().reverse().map(tr => {
+      const d = new Date(tr.start);
+      const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      return `<li><div><strong>${when}${tr.mode === "sim" ? " · simulated" : ""}</strong><span>${(tr.dist * U.df).toFixed(2)} ${U.dist} · ${fmtTime(tr.dur)} · top ${Math.round(tr.max * U.f)} ${U.label}</span></div>
+        <div class="acts"><button class="btn sm" data-x="gpx" data-id="${tr.id}">GPX</button><button class="btn sm" data-x="csv" data-id="${tr.id}">CSV</button><button class="btn sm" data-x="del" data-id="${tr.id}" aria-label="Delete trip">Delete</button></div></li>`;
+    }).join("");
+  }
+  function download(name, text, type) {
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
+    document.body.appendChild(a); a.click();
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+  }
+  const iso = t => new Date(t).toISOString();
+  function toGPX(tr) {
+    const pts = tr.pts.map(p => `      <trkpt lat="${p[1]}" lon="${p[2]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ""}<time>${iso(p[0])}</time></trkpt>`).join("\n");
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Pacer Speedometer" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>Pacer trip ${iso(tr.start)}</name><trkseg>\n${pts}\n  </trkseg></trk>\n</gpx>\n`;
+  }
+  const toCSV = tr => "time_utc,latitude,longitude,altitude_m,speed_kmh\n" + tr.pts.map(p => [iso(p[0]), p[1], p[2], p[3] ?? "", (p[4] * 3.6).toFixed(1)].join(",")).join("\n") + "\n";
+  $("#trips").addEventListener("click", e => {
+    const b = e.target.closest("button[data-x]"); if (!b) return;
+    const trips = loadTrips(), tr = trips.find(t => String(t.id) === b.dataset.id); if (!tr) return;
+    const stamp = iso(tr.start).slice(0, 16).replace(/[:T]/g, "-");
+    if (b.dataset.x === "gpx") download(`pacer-${stamp}.gpx`, toGPX(tr), "application/gpx+xml");
+    else if (b.dataset.x === "csv") download(`pacer-${stamp}.csv`, toCSV(tr), "text/csv");
+    else if (b.dataset.x === "del") {
+      if (b.dataset.confirm) { store.set("trips", trips.filter(t => t !== tr)); renderTrips(); }
+      else { b.dataset.confirm = "1"; b.textContent = "Tap to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Delete"; } }, 3000); }
+    }
+  });
+  $("#recBtn").onclick = e => {
+    const btn = e.currentTarget;
+    if (!rec.on) {
+      rec.on = true; rec.points = []; rec.start = Date.now(); rec.trip0 = { ...state.trip };
+      btn.textContent = "Stop & save"; btn.classList.add("rec"); btn.classList.remove("primary"); btn.setAttribute("aria-pressed", "true");
+      return;
+    }
+    rec.on = false;
+    btn.textContent = "Start recording"; btn.classList.remove("rec"); btn.classList.add("primary"); btn.setAttribute("aria-pressed", "false");
+    if (rec.points.length < 2) { $("#recInfo").textContent = "Nothing to save yet. Record for a few seconds while moving."; return; }
+    let pts = rec.points; const step = Math.ceil(pts.length / 1500); if (step > 1) pts = pts.filter((_, i) => i % step === 0);
+    const tr = { id: rec.start, start: rec.start, dur: (Date.now() - rec.start) / 1000, dist: state.trip.dist - rec.trip0.dist,
+      max: Math.max(...rec.points.map(p => p[4])), mode: state.mode, pts };
+    const trips = loadTrips(); trips.push(tr); while (trips.length > 15) trips.shift();
+    store.set("trips", trips);
+    const saved = loadTrips().some(t => t.id === tr.id);
+    $("#recInfo").textContent = saved ? "Trip saved. Export it as GPX or CSV below." : "Couldn't save: this browser's storage is full or blocked. Delete an old trip and try again.";
+    renderTrips();
+  };
+
+  // ---------- Theme ----------
+  function applyTheme(th) {
+    if (th === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", th);
+    document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.th === th));
+  }
+  document.querySelectorAll("#themeSeg button").forEach(b => b.onclick = () => { store.set("theme", b.dataset.th); applyTheme(b.dataset.th); });
+  applyTheme(["auto", "light", "dark"].includes(store.get("theme", "auto")) ? store.get("theme", "auto") : "auto");
+
   applyUnit();
+  renderTrips();
   applyStyle();
   useSource("sim");
   requestAnimationFrame(frame);
