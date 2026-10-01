@@ -6,292 +6,362 @@
 <meta name="theme-color" content="#0c1117">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="description" content="Pacer: a GPS speedometer for your phone browser.">
 <title>Pacer Speedometer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700;800&display=swap">
 <style>
-/* Layout: app shell. Drive = speedometer only (primary zone). Trip / Settings / About are secondary screens behind a bottom tab bar (floating pill on wide screens). */
+/* =====================================================================
+   Design system
+   Layout: app shell with four screens behind a tab bar. Drive is speed-first:
+   status bar → gauge → limit + trip line → quiet controls.
+   ===================================================================== */
 :root{
-  --bg:#eceff2; --panel:#ffffff; --sunk:#f4f6f8; --ink:#141c25; --muted:#5a6672; --line:#d3d9e0;
-  --accent:#b86a00; --accent-soft:rgba(184,106,0,.14); --alert:#cf3434; --alert-soft:rgba(207,52,52,.14); --ok:#1d7f54;
-  --needle:#cf3434; --face:#f7f8fa;
+  /* colour: surfaces */
+  --bg:#eceff2; --surface:#ffffff; --sunk:#f3f5f7; --line:#d5dbe1;
+  /* colour: text */
+  --ink:#121a23; --muted:#56626e;
+  /* colour: semantic */
+  --accent:#a85f00; --accent-soft:rgba(168,95,0,.13);
+  --ok:#17784e; --ok-soft:rgba(23,120,78,.13);
+  --warn:#a85f00;
+  --alert:#c62828; --alert-soft:rgba(198,40,40,.13);
+  --needle:#c62828; --face:#ffffff;
+  /* type */
   --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --r:12px; --tabh:62px;
+  --fs-xs:11px; --fs-s:13px; --fs-m:15px; --fs-l:19px; --fs-xl:26px; --fs-2xl:34px;
+  /* spacing */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:24px; --s6:32px;
+  /* radii */
+  --r-s:8px; --r-m:12px; --r-l:16px;
+  /* motion */
+  --dur-fast:.15s; --dur:.3s; --ease:cubic-bezier(.2,.7,.2,1);
+  /* sizes */
+  --tap:44px; --icon:20px; --tabh:60px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-  --bg:#0c1117; --panel:#141b23; --sunk:#10161d; --ink:#e6ebf0; --muted:#8b98a6; --line:#25303c;
-  --accent:#ffb12e; --accent-soft:rgba(255,177,46,.15); --alert:#ff5b52; --alert-soft:rgba(255,91,82,.16); --ok:#3fcf8e;
-  --needle:#ff5b52; --face:#0f151c; color-scheme:dark}}
+  --bg:#0b1016; --surface:#131a22; --sunk:#0f151c; --line:#253039;
+  --ink:#eaeef2; --muted:#93a0ad;
+  --accent:#ffb42e; --accent-soft:rgba(255,180,46,.15);
+  --ok:#3fd18f; --ok-soft:rgba(63,209,143,.14); --warn:#ffb42e;
+  --alert:#ff5a50; --alert-soft:rgba(255,90,80,.16);
+  --needle:#ff5a50; --face:#0f151c; color-scheme:dark}}
 :root[data-theme="dark"]{
-  --bg:#0c1117; --panel:#141b23; --sunk:#10161d; --ink:#e6ebf0; --muted:#8b98a6; --line:#25303c;
-  --accent:#ffb12e; --accent-soft:rgba(255,177,46,.15); --alert:#ff5b52; --alert-soft:rgba(255,91,82,.16); --ok:#3fcf8e;
-  --needle:#ff5b52; --face:#0f151c; color-scheme:dark}
+  --bg:#0b1016; --surface:#131a22; --sunk:#0f151c; --line:#253039;
+  --ink:#eaeef2; --muted:#93a0ad;
+  --accent:#ffb42e; --accent-soft:rgba(255,180,46,.15);
+  --ok:#3fd18f; --ok-soft:rgba(63,209,143,.14); --warn:#ffb42e;
+  --alert:#ff5a50; --alert-soft:rgba(255,90,80,.16);
+  --needle:#ff5a50; --face:#0f151c; color-scheme:dark}
 
 *{box-sizing:border-box}
 html,body{margin:0;min-height:100%}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;transition:background-color .3s,color .3s}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:var(--fs-m);line-height:1.5;-webkit-font-smoothing:antialiased;transition:background-color var(--dur) var(--ease),color var(--dur) var(--ease)}
 [hidden]{display:none!important}
 h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;line-height:1.1;text-wrap:balance;margin:0}
-p{margin:0 0 12px}
+p{margin:0 0 var(--s3)}
 a{color:var(--accent)}
 code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
-button,input{font:inherit;color:inherit}
+button,input,select{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
-.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.eyebrow{font-family:var(--f-mono);font-size:var(--fs-xs);letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
 .muted{color:var(--muted)}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
-@keyframes pulse{50%{opacity:.25}}
+.num{font-variant-numeric:tabular-nums}
+@keyframes pulse{50%{opacity:.3}}
+svg.i{width:var(--icon);height:var(--icon);stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
 
 /* ---------- shell ---------- */
 .app{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px))}
-.view{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 20px) 28px}
-.pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
-.pagehead h1{font-size:34px}
-.pagehead p{margin:4px 0 0;color:var(--muted);max-width:60ch}
-
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
-.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:var(--tabh);color:var(--muted);text-decoration:none;font-size:11px;font-weight:500;position:relative;transition:color .15s}
-.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.view{max-width:1040px;margin:0 auto;padding-inline:var(--s4);padding-block:calc(env(safe-area-inset-top,0px) + var(--s5)) var(--s6)}
+.pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:var(--s3);margin-bottom:var(--s5)}
+.pagehead h1{font-size:var(--fs-2xl)}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:var(--tabh);color:var(--muted);text-decoration:none;font-size:var(--fs-xs);font-weight:500;position:relative;transition:color var(--dur-fast)}
+.tabs .i{width:22px;height:22px}
 .tabs a[aria-current="page"]{color:var(--ink)}
-.tabs a[aria-current="page"] svg{stroke:var(--accent)}
-.tabs a[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:2px;border-radius:0 0 2px 2px;background:var(--accent)}
+.tabs a[aria-current="page"] .i{stroke:var(--accent)}
+.tabs a[aria-current="page"]::before{content:"";position:absolute;top:0;left:32%;right:32%;height:2px;border-radius:0 0 2px 2px;background:var(--accent)}
 .tabs .live{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.over .tabs a[data-to="drive"]{color:var(--alert)}
-.over .tabs a[data-to="drive"] svg{stroke:var(--alert)}
-@media (min-width:820px){
+.over .tabs a[data-to="drive"], .over .tabs a[data-to="drive"] .i{color:var(--alert);stroke:var(--alert)}
+@media (min-width:820px) and (min-height:561px){
   .app{padding-bottom:96px}
-  .tabs{left:50%;right:auto;bottom:18px;transform:translateX(-50%);width:460px;border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.14);overflow:hidden;padding-bottom:0}
-  .tabs a{flex-direction:row;gap:8px;height:52px;font-size:13px}
+  .tabs{left:50%;right:auto;bottom:18px;transform:translateX(-50%);width:440px;border:1px solid var(--line);border-radius:var(--r-l);box-shadow:0 8px 24px rgba(0,0,0,.12);overflow:hidden;padding-bottom:0}
+  .tabs a{flex-direction:row;gap:var(--s2);height:50px;font-size:var(--fs-s)}
   .tabs a[aria-current="page"]::before{top:auto;bottom:0;border-radius:2px 2px 0 0}
 }
+@media (orientation:landscape) and (max-height:560px){
+  :root{--tabh:46px}
+  .tabs a{flex-direction:row;gap:6px;font-size:var(--fs-s)}
+}
 
-/* ---------- drive ---------- */
-.drive{display:flex;flex-direction:column;align-items:center;min-height:calc(100dvh - var(--tabh) - env(safe-area-inset-bottom,0px));padding-block:calc(env(safe-area-inset-top,0px) + 12px) 12px}
-@media (min-width:820px){.drive{min-height:calc(100dvh - 96px)}}
-.drivebar{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:10px}
-.drivebar .right{display:flex;align-items:center;gap:10px}
-.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:0;max-width:62vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
-.status[data-s="ok"] .dot{background:var(--ok)}
-.status[data-s="sim"] .dot{background:var(--accent)}
-.status[data-s="bad"] .dot{background:var(--alert)}
-.status[data-s="wait"] .dot{animation:pulse 1.2s infinite}
-.recpill{white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--alert);font-variant-numeric:tabular-nums}
-.recpill .dot{background:var(--alert);animation:pulse 1.2s infinite}
-.sign{width:44px;height:44px;border-radius:50%;border:4px solid var(--alert);background:var(--panel);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:-.02em;line-height:1;color:var(--ink);text-decoration:none;flex:none}
-.iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;cursor:pointer;flex:none}
-.iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%}
-.dial{position:relative;width:clamp(240px,calc(100dvh - 450px),540px);max-width:100%;aspect-ratio:1;container-type:inline-size;border-radius:50%}
-body.drive .dial{width:min(100%,86dvh,640px)}
-.dial canvas{position:absolute;inset:0;width:100%;height:100%}
-.readout{position:absolute;left:0;right:0;top:55%;text-align:center;pointer-events:none}
-.readout .v{font-family:var(--f-display);font-weight:700;font-size:21cqw;line-height:.9;font-variant-numeric:tabular-nums;transition:color .2s}
-.readout .u{font-family:var(--f-mono);font-size:max(11px,2.8cqw);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
-.flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:max(10px,2.5cqw);letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
-.over .flag{visibility:visible;animation:pulse .9s infinite}
-.warn .readout .v{color:var(--accent)}
-.over .readout .v{color:var(--alert)}
-.dial[data-style="sport"] .readout{top:38%}
-.dial[data-style="digital"]{border-radius:14px}
-.dial[data-style="digital"] .readout{top:9%}
-.dial[data-style="digital"] .readout .v{font-size:38cqw}
-.dial[data-style="hud"]{background:#000;border-radius:14px}
-.dial[data-style="hud"] .readout{top:13%}
-.dial[data-style="hud"] .readout .v{font-size:43cqw;color:#7dffb0;text-shadow:0 0 18px rgba(125,255,176,.45)}
-.dial[data-style="hud"] .readout .u{color:#7dffb0;opacity:.8}
-.over .dial[data-style="hud"] .readout .v{color:#ff5b52;text-shadow:0 0 18px rgba(255,91,82,.5)}
-.dial.mirror{transform:scaleX(-1)}
-.picker{display:flex;flex-direction:column;align-items:center;gap:6px}
-.dots{display:flex;gap:6px;align-items:center}
-.dots i{width:6px;height:6px;border-radius:3px;background:var(--line);transition:width .25s,background-color .25s}
-.dots i.on{width:18px;background:var(--accent)}
-.picker .hint{font-size:12px;color:var(--muted)}
-/* quick controls on the Drive screen */
-.mini{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;text-decoration:none;color:var(--muted);font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
-.mini b{font-family:var(--f-display);font-size:19px;font-weight:600;color:var(--ink);letter-spacing:0;margin-left:5px;font-variant-numeric:tabular-nums;text-transform:none}
-.dock{width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px}
-.dockrow{display:flex;gap:10px;align-items:stretch;min-width:0}
-.dock .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%;border-radius:10px}
-.dock .seg button{min-height:44px;padding:6px 4px}
-.dockrow > .seg{flex:1;width:auto}
-.limitctl{display:flex;align-items:center;gap:6px;flex:none}
-.limitctl button{width:40px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:19px;cursor:pointer}
-.dockbtn{flex:1;min-height:46px;border:1px solid var(--line);background:var(--panel);border-radius:10px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
-.dockbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.dockbtn .rdot{width:10px;height:10px;border-radius:50%;background:var(--alert)}
-.dockbtn[aria-pressed="true"].recb{background:var(--alert);border-color:var(--alert);color:var(--panel)}
-.dockbtn[aria-pressed="true"].recb .rdot{background:var(--panel);animation:pulse 1.2s infinite}
-.dockbtn[aria-pressed="true"].bell{border-color:var(--ok);color:var(--ok)}
-body.drive .dock, body.drive .mini{display:none}
-/* location gate: speedometer locked and blurred until GPS is allowed */
-.drive{position:relative}
-.gated .stage, .gated .dock{filter:blur(7px) grayscale(.7);opacity:.45;pointer-events:none;user-select:none;transition:filter .3s,opacity .3s}
-.gate{position:absolute;inset:calc(env(safe-area-inset-top,0px) + 70px) 16px 16px;display:grid;place-items:center;z-index:5}
-.gatecard{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 20px;box-shadow:0 18px 50px rgba(0,0,0,.18);max-height:100%;overflow:auto}
-.gateicon{width:52px;height:52px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;margin-bottom:14px}
-.gateicon svg{width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.gate[data-kind="denied"] .gateicon, .gate[data-kind="off"] .gateicon{background:var(--alert-soft)}
-.gate[data-kind="denied"] .gateicon svg, .gate[data-kind="off"] .gateicon svg{stroke:var(--alert)}
-.gate[data-kind="requesting"] .gateicon{animation:pulse 1.6s infinite}
-.gatecard h2{font-size:26px;margin-bottom:6px}
-.gatecard p{color:var(--muted);margin-bottom:12px}
-.gatecard ol{margin:0 0 14px;padding-left:20px;font-size:14px}
-.gatecard ol li{margin-bottom:6px}
-.gatecard .platform{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
-.gatebtns{display:flex;flex-direction:column;gap:8px}
-.gatebtns .dockbtn{flex:none}
-.dockbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
-.linkbtn{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer;padding:6px}
-body.drive .tabs{display:none}
-body.drive .app{padding-bottom:0}
-body.drive .drive{min-height:100dvh}
-body[data-view="drive"].hudbg{background:#000}
-body[data-view="drive"].hudbg .picker .hint{color:#7dffb0;opacity:.7}
-
-/* ---------- shared panels ---------- */
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
-.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
-@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
-.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 13px;cursor:pointer;font-size:13px;font-weight:500;transition:background-color .15s,border-color .15s,color .15s}
+/* ---------- controls ---------- */
+.btn{min-height:var(--tap);border:1px solid var(--line);background:var(--surface);border-radius:var(--r-m);padding:0 var(--s4);cursor:pointer;font-size:var(--fs-m);font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);transition:background-color var(--dur-fast),border-color var(--dur-fast),color var(--dur-fast)}
 .btn:hover{border-color:var(--muted)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
-.btn.rec{background:var(--alert);border-color:var(--alert);color:var(--panel)}
-.btn.sm{padding:4px 9px;font-size:12px}
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk);max-width:100%}
-.seg button{border:0;background:transparent;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:background-color .15s,color .15s,box-shadow .15s}
-.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
-
-/* ---------- trip ---------- */
-.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.stat{background:var(--panel);padding:12px 14px}
-.stat .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.stat .n{font-family:var(--f-display);font-size:32px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
-.stat .n small{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
-.chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
-.chip{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0}
-.chip .k{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip .n{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
-.arw{width:12px;height:12px;fill:var(--accent);transition:transform .4s ease;flex:none}
-.spark{width:100%;height:96px;display:block}
-.trips{list-style:none;padding:0;margin:0}
-.trips li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:10px 0}
-.trips li > div:first-child{min-width:0}
-.trips strong{display:block;font-size:14px}
-.trips span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
-.acts{display:flex;gap:6px}
-.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
-
-/* ---------- settings ---------- */
-.settings{max-width:640px}
-.gh{margin:22px 4px 8px}
-.gh:first-of-type{margin-top:0}
-.group{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-.item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:13px 14px;border-top:1px solid var(--line)}
-.item:first-child{border-top:0}
-.item .lbl{font-weight:500;min-width:0;flex:1 1 200px}
-.item .sub{display:block;font-size:12px;color:var(--muted);font-weight:400;max-width:42ch}
-.switch{position:relative;width:48px;height:28px;border-radius:14px;border:0;background:var(--line);cursor:pointer;flex:none;transition:background-color .2s}
-.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--surface)}
+.btn.danger{background:var(--alert);border-color:var(--alert);color:var(--surface)}
+.btn.sm{min-height:34px;padding:0 var(--s3);font-size:var(--fs-s);font-weight:500;border-radius:var(--r-s)}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);background:var(--sunk);border-radius:var(--r-m);padding:3px;gap:3px}
+.seg button{min-height:38px;border:0;background:transparent;border-radius:9px;cursor:pointer;font-size:var(--fs-s);font-weight:500;color:var(--muted);padding:0 var(--s2);transition:background-color var(--dur-fast),color var(--dur-fast)}
+.seg button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.switch{position:relative;width:50px;height:30px;border-radius:15px;border:0;background:var(--line);cursor:pointer;flex:none;transition:background-color var(--dur)}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform var(--dur) var(--ease)}
 .switch[aria-checked="true"]{background:var(--ok)}
 .switch[aria-checked="true"]::after{transform:translateX(20px)}
-.switch:disabled{opacity:.4;cursor:not-allowed}
-.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.stepper button{border:0;background:var(--sunk);width:38px;height:36px;cursor:pointer;font-size:17px}
-.stepper input{width:64px;height:36px;border:0;border-inline:1px solid var(--line);background:var(--panel);text-align:center;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.note{font-size:13px;color:var(--muted);background:var(--sunk);border-top:1px solid var(--line);padding:11px 14px;margin:0}
 
-/* ---------- about ---------- */
-.about{max-width:760px}
-.jump{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:26px}
-.jump button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted)}
-.jump button:hover{color:var(--ink)}
-.about section{margin-bottom:44px;min-width:0;scroll-margin-top:16px}
-.about h2{font-size:28px;margin-bottom:12px}
-.about h3{font-size:19px;margin:22px 0 6px}
-.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:12px 0}
-table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
+/* ---------- drive ---------- */
+.drive{display:grid;grid-template-columns:minmax(0,1fr);grid-template-areas:"bar" "stage" "sec" "ctl";grid-template-rows:auto 1fr auto auto;gap:var(--s3);min-height:calc(100dvh - var(--tabh) - env(safe-area-inset-bottom,0px));max-width:560px;padding-block:calc(env(safe-area-inset-top,0px) + var(--s3)) var(--s3);position:relative}
+.drivebar{grid-area:bar;display:flex;align-items:center;justify-content:space-between;gap:var(--s3);min-width:0}
+.brand{font-family:var(--f-display);font-weight:700;font-size:var(--fs-l);letter-spacing:.04em}
+.barright{display:flex;align-items:center;gap:var(--s2);min-width:0}
+.gps{display:inline-flex;align-items:center;gap:var(--s2);min-height:34px;padding:0 var(--s3);border-radius:999px;background:var(--surface);border:1px solid var(--line);font-family:var(--f-mono);font-size:12px;white-space:nowrap;min-width:0;overflow:hidden}
+.gps .bars{display:inline-flex;align-items:flex-end;gap:2px;height:12px}
+.gps .bars i{width:3px;border-radius:1px;background:var(--line)}
+.gps .bars i:nth-child(1){height:5px}.gps .bars i:nth-child(2){height:8px}.gps .bars i:nth-child(3){height:12px}
+.gps[data-q="3"] .bars i{background:var(--ok)}
+.gps[data-q="2"] .bars i:nth-child(-n+2){background:var(--ok)}
+.gps[data-q="1"] .bars i:nth-child(1){background:var(--warn)}
+.gps[data-s="poor"]{border-color:var(--warn);color:var(--warn)}
+.gps[data-s="lost"],.gps[data-s="blocked"]{border-color:var(--alert);color:var(--alert)}
+.gps[data-s="acquiring"] .bars{animation:pulse 1.2s infinite}
+.recpill{display:inline-flex;align-items:center;gap:6px;min-height:34px;padding:0 var(--s2);border:0;background:none;color:var(--alert);font-family:var(--f-mono);font-size:12px;white-space:nowrap;cursor:pointer}
+.recpill .dot{width:8px;height:8px;border-radius:50%;background:var(--alert);animation:pulse 1.2s infinite}
+.recpill.paused{color:var(--muted)}.recpill.paused .dot{background:var(--muted);animation:none}
+.iconbtn{width:var(--tap);height:var(--tap);border-radius:var(--r-m);border:0;background:transparent;display:grid;place-items:center;cursor:pointer;color:var(--muted);flex:none}
+.iconbtn:hover{color:var(--ink)}
+
+.stage{grid-area:stage;display:grid;place-items:center;min-height:0}
+.dial{position:relative;width:clamp(220px,min(100%,calc(100dvh - 420px)),540px);aspect-ratio:1;container-type:inline-size;transition:opacity var(--dur)}
+.dial canvas{position:absolute;inset:0;width:100%;height:100%}
+.readout{position:absolute;left:0;right:0;text-align:center;pointer-events:none}
+.readout .v{font-family:var(--f-display);font-weight:700;line-height:.86;font-variant-numeric:tabular-nums;transition:color var(--dur)}
+.readout .u{font-family:var(--f-mono);font-size:max(11px,2.9cqw);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:1.2cqw;transition:color var(--dur)}
+.dial.nodata .readout .v{color:var(--muted)}
+.dial.nodata .readout .u{letter-spacing:.06em;text-transform:none;font-family:var(--f-body);font-size:max(13px,3.6cqw)}
+.near .readout .v{color:var(--warn)}
+.over .readout .v{color:var(--alert)}
+/* Classic */
+.dial[data-style="classic"] .readout{top:57%}
+.dial[data-style="classic"] .readout .v{font-size:21cqw}
+/* Sport: slanted, heavier numerals inside an LED ring */
+.dial[data-style="sport"] .readout{top:31%}
+.dial[data-style="sport"] .readout .v{font-size:31cqw;font-weight:800;font-style:normal;transform:skewX(-8deg)}
+/* Digital: the number is the instrument */
+.dial[data-style="digital"] .readout{top:16%}
+.dial[data-style="digital"] .readout .v{font-size:44cqw;font-weight:600}
+/* HUD: one high-contrast number on black, for windshield reflection */
+.dial[data-style="hud"]{background:#000;border-radius:var(--r-l)}
+.dial[data-style="hud"] .readout{top:18%}
+.dial[data-style="hud"] .readout .v{font-size:50cqw;color:#9dffc6}
+.dial[data-style="hud"] .readout .u{color:#9dffc6;opacity:.75}
+.over .dial[data-style="hud"] .readout .v,.over .dial[data-style="hud"] .readout .u{color:#ff5a50;opacity:1}
+.near .dial[data-style="hud"] .readout .v{color:#ffd27a}
+.dial[data-style="hud"].nodata .readout .v,.dial[data-style="hud"].nodata .readout .u{color:#6b7a73}
+.dial.mirror{transform:scaleX(-1)}
+
+.secondary{grid-area:sec;display:flex;align-items:center;justify-content:space-between;gap:var(--s3)}
+.limit{display:flex;align-items:center;gap:2px}
+.limit .step{width:var(--tap);height:var(--tap);border-radius:50%;border:0;background:transparent;font-size:22px;line-height:1;cursor:pointer;color:var(--muted)}
+.limit .step:hover{color:var(--ink);background:var(--sunk)}
+.sign{width:50px;height:50px;border-radius:50%;border:5px solid var(--alert);background:#fff;color:#111;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:18px;letter-spacing:-.02em;line-height:1;flex:none;transition:transform var(--dur) var(--ease)}
+.over .sign{animation:pulse 1s infinite}
+.tripline{display:flex;flex-direction:column;align-items:flex-end;text-decoration:none;color:var(--ink);min-width:0}
+.tripline b{font-family:var(--f-display);font-size:var(--fs-xl);font-weight:600;line-height:1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.tripline span{font-size:var(--fs-s);color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.controls{grid-area:ctl;display:flex;flex-direction:column;gap:var(--s2)}
+.ctlrow{display:flex;gap:var(--s2);min-width:0}
+.ctlrow > *{flex:1;min-width:0}
+.ctlrow .btn{width:100%}
+.btn.rec .rdot{width:10px;height:10px;border-radius:50%;background:var(--alert);flex:none}
+.btn.rec[data-state="on"]{background:var(--alert);border-color:var(--alert);color:#fff}
+.btn.rec[data-state="on"] .rdot{background:#fff;animation:pulse 1.2s infinite}
+.btn.rec[data-state="paused"]{border-color:var(--alert);color:var(--alert)}
+.btn.bell[aria-pressed="true"]{border-color:var(--ok);color:var(--ok)}
+.mirrorchip{flex:0 0 auto!important}
+
+/* landscape phones: gauge left, everything else right */
+@media (orientation:landscape) and (max-height:560px){
+  .drive{max-width:none;grid-template-columns:minmax(0,1fr) minmax(280px,360px);grid-template-areas:"bar bar" "stage sec" "stage ctl";grid-template-rows:auto auto 1fr;column-gap:var(--s5)}
+  .dial{width:min(100%,calc(100dvh - var(--tabh) - 84px))}
+  .controls{justify-content:flex-start}
+  .seg button{min-height:34px}
+}
+/* drive mode: gauge only */
+body.drive .tabs{display:none}
+body.drive .app{padding-bottom:0}
+body.drive .drive{min-height:100dvh;grid-template-areas:"bar" "stage";grid-template-rows:auto 1fr;grid-template-columns:minmax(0,1fr);max-width:none}
+body.drive .secondary, body.drive .controls{display:none}
+body.drive .dial{width:min(100%,calc(100dvh - 90px),760px)}
+body[data-view="drive"].hudbg{background:#000;color:#cfd8d3;--surface:#0e1311;--sunk:#141b18;--line:#27312c;--ink:#d6e0da;--muted:#82918a;color-scheme:dark}
+body[data-view="drive"].hudbg .gps{background:#000;border-color:#26302b}
+body[data-view="drive"].hudbg .tripline, body[data-view="drive"].hudbg .brand{color:#cfd8d3}
+
+/* location gate */
+.gated .stage, .gated .secondary, .gated .controls{filter:blur(8px) grayscale(.8);opacity:.4;pointer-events:none;user-select:none}
+.gate{position:absolute;inset:calc(env(safe-area-inset-top,0px) + 64px) 0 var(--s3);display:grid;place-items:center;z-index:5}
+.gatecard{width:100%;max-width:400px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:var(--s5) 20px;box-shadow:0 18px 48px rgba(0,0,0,.18);max-height:100%;overflow:auto}
+.gateicon{width:52px;height:52px;border-radius:50%;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;margin-bottom:var(--s3)}
+.gateicon .i{width:26px;height:26px}
+.gate[data-kind="denied"] .gateicon,.gate[data-kind="off"] .gateicon,.gate[data-kind="unsupported"] .gateicon{background:var(--alert-soft);color:var(--alert)}
+.gate[data-kind="requesting"] .gateicon{animation:pulse 1.6s infinite}
+.gatecard h2{font-size:var(--fs-xl);margin-bottom:6px}
+.gatecard p{color:var(--muted)}
+.gatecard ol{margin:0 0 var(--s4);padding-left:20px;font-size:14px}
+.gatecard ol li{margin-bottom:6px}
+.gatecard .platform{margin-bottom:6px}
+.gatebtns{display:flex;flex-direction:column;gap:var(--s2)}
+.linkbtn{background:none;border:0;color:var(--muted);font-size:var(--fs-s);text-decoration:underline;cursor:pointer;min-height:36px}
+
+/* ---------- cards (trip, settings) ---------- */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);padding:var(--s4);min-width:0}
+.cardhead{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-bottom:var(--s3)}
+.cols{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:var(--s4);align-items:start}
+.stack{display:flex;flex-direction:column;gap:var(--s4);min-width:0}
+@media (max-width:820px){.cols{grid-template-columns:minmax(0,1fr)}}
+.hero .big{font-family:var(--f-display);font-size:64px;font-weight:600;line-height:.95;font-variant-numeric:tabular-nums}
+.hero .big small{font-family:var(--f-mono);font-size:var(--fs-s);color:var(--muted);font-weight:400;margin-left:6px}
+.trio{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:var(--s3);margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--line)}
+.stat .k{display:block;font-size:var(--fs-s);color:var(--muted)}
+.stat .n{font-family:var(--f-display);font-size:var(--fs-xl);font-weight:600;line-height:1.1;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat .n small{font-family:var(--f-mono);font-size:var(--fs-xs);color:var(--muted);font-weight:400;margin-left:3px}
+.duo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}
+.dist{display:flex;flex-direction:column;gap:6px;margin-top:var(--s4)}
+.dist .row{display:grid;grid-template-columns:76px minmax(0,1fr) 40px;align-items:center;gap:var(--s2);font-size:var(--fs-s);font-variant-numeric:tabular-nums}
+.dist .lab{color:var(--muted);white-space:nowrap}
+.dist .bar{height:10px;border-radius:5px;background:var(--sunk);overflow:hidden}
+.dist .bar i{display:block;height:100%;border-radius:5px;background:var(--accent);transition:width var(--dur) var(--ease)}
+.dist .row.over .bar i{background:var(--alert)}
+.dist .pct{text-align:right;color:var(--muted)}
+.chartwrap{position:relative}
+.chart{width:100%;height:150px;display:block}
+.minis{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:var(--s3)}
+.mini .k{display:block;font-size:var(--fs-s);color:var(--muted)}
+.mini .n{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:22px;font-weight:600;font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini .hint{display:block;font-size:12px;color:var(--muted)}
+.arw{width:12px;height:12px;fill:var(--accent);transition:transform .4s ease;flex:none}
+.tag{display:inline-block;font-family:var(--f-mono);font-size:10px;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:4px;background:var(--sunk);color:var(--muted)}
+.tag.ok{background:var(--ok-soft);color:var(--ok)}
+.tag.warn{background:var(--accent-soft);color:var(--warn)}
+.recctl{display:flex;gap:var(--s2);flex-wrap:wrap}
+.recctl .btn{flex:1 1 120px}
+.trips{list-style:none;padding:0;margin:var(--s3) 0 0}
+.trips li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:var(--s2);border-top:1px solid var(--line);padding:var(--s3) 0}
+.trips li > div:first-child{min-width:0}
+.trips strong{display:block;font-size:14px}
+.trips span{font-size:var(--fs-s);color:var(--muted);font-variant-numeric:tabular-nums}
+.acts{display:flex;gap:6px}
+
+.settings{max-width:620px}
+.gh{margin:var(--s5) 4px var(--s2)}
+.gh:first-of-type{margin-top:0}
+.group{background:var(--surface);border:1px solid var(--line);border-radius:var(--r-l);overflow:hidden}
+.item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:var(--s3) var(--s4);padding:var(--s3) var(--s4);border-top:1px solid var(--line);min-height:60px}
+.item:first-child{border-top:0}
+.item .lbl{font-weight:500;min-width:0;flex:1 1 200px}
+.item .sub{display:block;font-size:var(--fs-s);color:var(--muted);font-weight:400;max-width:44ch}
+.item .seg{flex:0 1 260px}
+.note{font-size:var(--fs-s);color:var(--muted);padding:var(--s3) var(--s4);margin:0}
+
+.about{max-width:720px}
+.about section{margin-bottom:var(--s6)}
+.about h2{font-size:var(--fs-xl);margin-bottom:var(--s3)}
+.about ul{padding-left:20px}
+.about li{margin-bottom:6px}
+.tbl{overflow-x:auto;border:1px solid var(--line);border-radius:var(--r-m);margin:var(--s3) 0}
+table{border-collapse:collapse;width:100%;min-width:480px;font-size:14px}
 th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
-th{font-family:var(--f-mono);font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
+th{font-family:var(--f-mono);font-size:var(--fs-xs);letter-spacing:.08em;text-transform:uppercase;color:var(--muted);background:var(--sunk)}
 tr:last-child td{border-bottom:0}
-td:first-child{white-space:nowrap;font-weight:600}
-pre{overflow-x:auto;background:var(--sunk);border:1px solid var(--line);border-radius:10px;padding:14px;font-family:var(--f-mono);font-size:12.5px;line-height:1.6;margin:10px 0 16px}
-pre code{background:none;border:0;padding:0;font-size:inherit}
-.eq{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border-left:3px solid var(--accent);padding:10px 14px;margin:10px 0 14px;overflow-x:auto;white-space:pre}
-ol.steps{padding-left:22px;margin:0}
-ol.steps li{margin-bottom:12px}
-ol.steps li::marker{font-family:var(--f-display);font-weight:700;color:var(--accent)}
-ul{padding-left:20px}
-.diagram{overflow-x:auto;margin:12px 0}
-.diagram svg{display:block;min-width:620px;width:100%;height:auto}
+td.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+
+.toast{position:fixed;left:50%;bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px) + 14px);transform:translateX(-50%);z-index:30;background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:var(--r-m);font-size:14px;max-width:calc(100% - 32px);box-shadow:0 8px 24px rgba(0,0,0,.2);transition:opacity var(--dur),transform var(--dur) var(--ease)}
+.toast[hidden]{display:block!important;opacity:0;pointer-events:none;transform:translate(-50%,8px)}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
 <body data-view="drive">
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-expand" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-shrink" viewBox="0 0 24 24"><path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/></symbol>
+  <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></symbol>
+  <symbol id="i-belloff" viewBox="0 0 24 24"><path d="M6 16v-5a6 6 0 0 1 9.5-4.9M18 11v5l1.5 2H8"/><path d="M10 20a2 2 0 0 0 4 0M4 4l16 16"/></symbol>
+  <symbol id="i-pin" viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></symbol>
+  <symbol id="i-gauge" viewBox="0 0 24 24"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="M12 13.5l4-5"/><circle cx="12" cy="14" r="1.2"/></symbol>
+  <symbol id="i-route" viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></symbol>
+  <symbol id="i-sliders" viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></symbol>
+  <symbol id="i-info" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></symbol>
+</svg>
 <div class="app" id="app">
 
   <!-- ===================== DRIVE ===================== -->
   <section class="view drive" data-view="drive" aria-label="Speedometer">
-    <div class="drivebar">
-      <div class="status" id="status" data-s="wait" role="status"><span class="dot"></span><span id="statusText">Starting GPS</span></div>
-      <div class="right">
-        <span class="recpill" id="recPill" hidden><span class="dot"></span><span id="recPillT">REC 0:00</span></span>
-        <button class="iconbtn" id="fsBtn" aria-pressed="false" aria-label="Drive mode: full screen, screen stays on">
-          <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
-        </button>
+    <header class="drivebar">
+      <span class="brand">PACER</span>
+      <div class="barright">
+        <button class="recpill" id="recPill" hidden aria-label="Recording, open trip"><span class="dot"></span><span id="recPillT" class="num">REC 0:00</span></button>
+        <span class="gps" id="gps" data-s="acquiring" data-q="0" role="status"><span class="bars" aria-hidden="true"><i></i><i></i><i></i></span><span id="gpsText">Finding GPS</span></span>
+        <button class="iconbtn" id="fsBtn" aria-pressed="false" aria-label="Drive mode: gauge only, full screen, screen stays on"><svg class="i"><use href="#i-expand" id="fsIcon"/></svg></button>
       </div>
-    </div>
+    </header>
+
     <div class="stage">
-      <div class="dial" id="dial" aria-label="Speedometer">
+      <div class="dial nodata" id="dial" data-style="classic">
         <canvas id="gauge" aria-hidden="true"></canvas>
         <div class="readout">
-          <div class="v" id="speedNum">0</div>
-          <div class="u" id="speedUnit">km/h</div>
-          <span class="flag">Over limit</span>
+          <div class="v" id="speedNum">––</div>
+          <div class="u" id="speedUnit">Finding GPS</div>
         </div>
       </div>
-      <a class="mini" href="#trip" aria-label="Open trip details">
-        <span>Trip<b id="mDist">0.00 km</b></span><span>Time<b id="mTime">0:00</b></span><span>Top<b id="mTop">0</b></span>
+    </div>
+
+    <div class="secondary">
+      <div class="limit" role="group" aria-label="Speed limit">
+        <button class="step" id="limDown" aria-label="Lower speed limit">−</button>
+        <span class="sign num" id="limitSign" aria-live="polite">100</span>
+        <button class="step" id="limUp" aria-label="Raise speed limit">+</button>
+      </div>
+      <a class="tripline" href="#trip" aria-label="Open trip">
+        <b id="lineDist">0.0 km</b>
+        <span id="lineTime">0:00 · avg 0</span>
       </a>
     </div>
-    <div class="dock" aria-label="Quick controls">
-      <div class="dockrow">
-        <button class="dockbtn bell" id="soundBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="soundBtnT">Speed alert off</span></button>
-        <div class="limitctl" role="group" aria-label="Speed limit">
-          <button id="limDown" aria-label="Lower speed limit">−</button>
-          <span class="sign" id="limitSign" aria-live="polite">100</span>
-          <button id="limUp" aria-label="Raise speed limit">+</button>
-        </div>
-      </div>
+
+    <div class="controls" aria-label="Quick controls">
       <div class="seg" role="group" aria-label="Units" id="unitSeg">
         <button data-u="kmh" aria-pressed="true">km/h</button>
         <button data-u="mph" aria-pressed="false">mph</button>
         <button data-u="ms" aria-pressed="false">m/s</button>
         <button data-u="kn" aria-pressed="false">knots</button>
       </div>
-      <div class="seg" role="group" aria-label="Speedometer style" id="styleSeg">
-        <button data-st="classic" aria-pressed="true">Classic</button>
-        <button data-st="sport" aria-pressed="false">Sport</button>
-        <button data-st="digital" aria-pressed="false">Digital</button>
-        <button data-st="hud" aria-pressed="false">HUD</button>
+      <div class="ctlrow">
+        <div class="seg" role="group" aria-label="Display style" id="styleSeg">
+          <button data-st="classic" aria-pressed="true">Classic</button>
+          <button data-st="sport" aria-pressed="false">Sport</button>
+          <button data-st="digital" aria-pressed="false">Digital</button>
+          <button data-st="hud" aria-pressed="false">HUD</button>
+        </div>
+        <div class="seg mirrorchip" id="mirrorWrap" hidden><button id="mirrorBtn" aria-pressed="false" style="padding:0 12px">Mirror</button></div>
       </div>
-      <div class="dockrow">
-        <button class="dockbtn recb" id="recBtnD" aria-pressed="false"><span class="rdot"></span><span id="recBtnDT">Record trip</span></button>
+      <div class="ctlrow">
+        <button class="btn rec" id="recBtnD" data-state="off"><span class="rdot"></span><span id="recBtnDT">Record</span></button>
+        <button class="btn bell" id="alertBtn" aria-pressed="false"><svg class="i"><use href="#i-belloff" id="alertIcon"/></svg><span id="alertBtnT">Alert off</span></button>
       </div>
     </div>
-    <div class="gate" id="gate" hidden role="dialog" aria-modal="false" aria-labelledby="gateTitle">
+
+    <div class="gate" id="gate" hidden role="dialog" aria-labelledby="gateTitle">
       <div class="gatecard">
-        <div class="gateicon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+        <div class="gateicon"><svg class="i"><use href="#i-pin"/></svg></div>
         <h2 id="gateTitle">Allow location to start</h2>
         <p id="gateText">Pacer reads your speed from your phone's GPS. Tap Allow when your browser asks.</p>
         <div id="gateSteps"></div>
         <div class="gatebtns">
-          <button class="dockbtn primary" id="gateBtn">Enable location</button>
-          <button class="linkbtn" id="gateReload">Still stuck? Reload the page</button>
+          <button class="btn primary" id="gateBtn">Enable location</button>
+          <button class="linkbtn" id="gateReload" hidden>Still stuck? Reload the page</button>
         </div>
       </div>
     </div>
@@ -301,35 +371,53 @@ ul{padding-left:20px}
   <!-- ===================== TRIP ===================== -->
   <section class="view" data-view="trip" hidden aria-label="Trip">
     <div class="pagehead">
-      <div><div class="eyebrow">Live while you drive</div><h1>Trip</h1></div>
-      <button class="btn" id="resetTrip">Reset trip</button>
+      <div><div class="eyebrow">Since last reset</div><h1>Trip</h1></div>
+      <button class="btn sm" id="resetTrip">Reset trip</button>
     </div>
-    <div class="grid2">
-      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
-        <div class="stats">
-          <div class="stat"><div class="k">Distance</div><div class="n"><span id="tDist">0.00</span><small id="tDistU">km</small></div></div>
-          <div class="stat"><div class="k">Elapsed</div><div class="n"><span id="tTime">0:00</span></div></div>
-          <div class="stat"><div class="k">Average (moving)</div><div class="n"><span id="tAvg">0</span><small class="uLbl">km/h</small></div></div>
-          <div class="stat"><div class="k">Top speed</div><div class="n"><span id="tMax">0</span><small class="uLbl">km/h</small></div></div>
+    <div class="cols">
+      <div class="stack">
+        <div class="card hero">
+          <div class="eyebrow" style="margin-bottom:6px">Distance</div>
+          <div class="big"><span id="tDist">0.00</span><small id="tDistU">km</small></div>
+          <div class="trio">
+            <div class="stat"><span class="k">Elapsed</span><span class="n" id="tElapsed">0:00</span></div>
+            <div class="stat"><span class="k">Moving</span><span class="n" id="tMoving">0:00</span></div>
+            <div class="stat"><span class="k">Avg moving</span><span class="n"><span id="tAvg">0</span><small class="uLbl">km/h</small></span></div>
+          </div>
         </div>
-        <div class="chips">
-          <div class="chip"><span class="k">Heading</span><span class="n"><svg class="arw" id="arw" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0L9 10L5 7.6L1 10z"/></svg><span id="iHdg">—</span></span></div>
-          <div class="chip"><span class="k">Altitude</span><span class="n" id="iAlt">—</span></div>
-          <div class="chip"><span class="k">Accel</span><span class="n" id="iG">0.00 g</span></div>
-          <div class="chip"><span class="k" id="iLaunchK">0–100 km/h</span><span class="n" id="iLaunch">—</span></div>
+        <div class="card">
+          <div class="cardhead"><div class="eyebrow">Speed</div></div>
+          <div class="duo">
+            <div class="stat"><span class="k">Now</span><span class="n"><span id="tNow">––</span><small class="uLbl">km/h</small></span></div>
+            <div class="stat"><span class="k">Top</span><span class="n"><span id="tMax">0</span><small class="uLbl">km/h</small></span></div>
+          </div>
+          <div class="dist" id="dist" aria-label="Share of moving time by speed"></div>
         </div>
-        <div class="panel">
-          <div class="sectionhead"><div class="eyebrow">Speed · last 60 seconds</div><div class="eyebrow" id="accText">±– m</div></div>
-          <canvas class="spark" id="spark" aria-label="Speed over the last 60 seconds"></canvas>
+        <div class="card">
+          <div class="cardhead"><div class="eyebrow">Last 5 minutes</div><div class="eyebrow" id="chartUnit">km/h</div></div>
+          <canvas class="chart" id="chart" aria-label="Speed over the last five minutes"></canvas>
         </div>
       </div>
-      <div class="panel">
-        <div class="sectionhead">
-          <div class="eyebrow">Trip log</div>
-          <button class="btn primary" id="recBtn" aria-pressed="false">Start recording</button>
+      <div class="stack">
+        <div class="card">
+          <div class="cardhead"><div class="eyebrow">Recording</div><span class="tag" id="recTag">Off</span></div>
+          <p class="muted" id="recInfo" style="font-size:14px">Record a drive to save its route on this phone and export it as GPX (maps) or CSV (spreadsheets).</p>
+          <div class="recctl">
+            <button class="btn primary" id="recStart">Start recording</button>
+            <button class="btn" id="recPause" hidden>Pause</button>
+            <button class="btn danger" id="recStop" hidden>Stop &amp; save</button>
+          </div>
+          <ul class="trips" id="trips"></ul>
         </div>
-        <p class="muted" id="recInfo" style="font-size:13px;margin:0 0 6px">Record a drive to save its route and stats on this phone, then export it as GPX for maps or CSV for spreadsheets.</p>
-        <ul class="trips" id="trips"></ul>
+        <div class="card">
+          <div class="cardhead"><div class="eyebrow">More measurements</div><span class="tag">GPS estimates</span></div>
+          <div class="minis">
+            <div class="mini"><span class="k">Heading</span><span class="n"><svg class="arw" id="arw" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0L9 10L5 7.6L1 10z"/></svg><span id="iHdg">––</span></span></div>
+            <div class="mini"><span class="k">Altitude</span><span class="n" id="iAlt">––</span><span class="hint">GPS altitude, ±10–30 m</span></div>
+            <div class="mini"><span class="k">Acceleration</span><span class="n" id="iG">––</span></div>
+            <div class="mini"><span class="k" id="iLaunchK">0–100 km/h</span><span class="n" id="iLaunch">––</span><span class="hint" id="iLaunchH">Stop, then accelerate</span></div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
@@ -337,16 +425,25 @@ ul{padding-left:20px}
   <!-- ===================== SETTINGS ===================== -->
   <section class="view" data-view="settings" hidden aria-label="Settings">
     <div class="settings">
-      <div class="pagehead"><div><div class="eyebrow">Saved on this device</div><h1>Settings</h1></div></div>
+      <div class="pagehead"><div><div class="eyebrow">Saved on this phone</div><h1>Settings</h1></div></div>
+      <p class="muted" style="font-size:14px;margin:-8px 4px 20px">Units, display style, speed limit, alerts and recording are on the Drive screen.</p>
 
-      <div class="eyebrow gh">Display</div>
+      <div class="eyebrow gh">Speed alert</div>
       <div class="group">
         <div class="item">
-          <span class="lbl" id="mirrorLbl">Mirror HUD<span class="sub">Flips the HUD style so it reads correctly as a windshield reflection at night.</span></span>
-          <button class="switch" id="mirrorSw" role="switch" aria-checked="false" aria-labelledby="mirrorLbl"></button>
+          <span class="lbl">Alert when over the limit by<span class="sub">The screen turns red past this point. The sound and vibration start after 1.5 s over, then repeat once a minute.</span></span>
+          <div class="seg" role="group" aria-label="Alert tolerance" id="tolSeg">
+            <button data-tol="0" aria-pressed="true">Any</button>
+            <button data-tol="0.05" aria-pressed="false">+5%</button>
+            <button data-tol="0.1" aria-pressed="false">+10%</button>
+          </div>
         </div>
+      </div>
+
+      <div class="eyebrow gh">Appearance</div>
+      <div class="group">
         <div class="item">
-          <span class="lbl">Theme</span>
+          <span class="lbl">Theme<span class="sub">Night is easier on the eyes in the dark. Day has the most contrast in sunlight.</span></span>
           <div class="seg" role="group" aria-label="Theme" id="themeSeg">
             <button data-th="auto" aria-pressed="true">Auto</button>
             <button data-th="light" aria-pressed="false">Day</button>
@@ -365,817 +462,759 @@ ul{padding-left:20px}
 
       <div class="eyebrow gh">Location</div>
       <div class="group">
-        <p class="note" id="note" style="border-top:0">Pacer starts GPS when it opens and asks for location once. If you blocked it, the Drive screen shows how to turn it back on. Speed is most accurate outdoors with a clear view of the sky.</p>
+        <p class="note" id="note">Pacer starts GPS when it opens and asks for location once. If you blocked it, the Drive screen shows how to turn it back on. Speed is most accurate outdoors with a clear view of the sky. Your location never leaves this phone.</p>
       </div>
-      <p class="muted" style="font-size:13px;margin:14px 4px 0">Units, style, speed limit, alerts and recording are on the Drive screen, where you use them.</p>
+
+      <div class="eyebrow gh">Data</div>
+      <div class="group">
+        <div class="item">
+          <span class="lbl">Saved trips<span class="sub" id="tripCount">No trips saved.</span></span>
+          <button class="btn sm" id="clearTrips">Delete all</button>
+        </div>
+      </div>
     </div>
   </section>
 
   <!-- ===================== ABOUT ===================== -->
   <section class="view about" data-view="about" hidden aria-label="About">
-    <div class="pagehead"><div><div class="eyebrow">Engineering notes · v2.0</div><h1>How Pacer works</h1>
-      <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and overspeed alerts, in one HTML file with no backend. Location never leaves your phone.</p></div></div>
-    <div class="jump">
-      <button data-scroll="components">Components</button>
-      <button data-scroll="design">Design</button>
-      <button data-scroll="principle">Working principle</button>
-      <button data-scroll="build">Implementation</button>
-      <button data-scroll="deploy">Deploy</button>
-    </div>
-<section id="components">
-  <h2>Components</h2>
-  <p>The app is split into small units with one job each. Sources produce raw fixes, the estimator turns them into one trusted speed, and everything on screen reads from a single state object.</p>
-  <div class="tbl"><table>
-    <thead><tr><th>Component</th><th>Responsibility</th><th>Web API</th></tr></thead>
-    <tbody>
-      <tr><td>GpsSource</td><td>Streams position fixes with Doppler speed and accuracy radius</td><td><code>geolocation.watchPosition</code></td></tr>
-      <tr><td>Location gate</td><td>Starts GPS on load, asks for permission, and locks and blurs the speedometer with device-specific steps until location works</td><td>Permissions API</td></tr>
-      <tr><td>Fix validator</td><td>Drops fixes with accuracy worse than 50 m, impossible jumps and stale timestamps</td><td>—</td></tr>
-      <tr><td>SpeedKalman</td><td>1-D Kalman filter that fuses noisy readings into a smooth speed estimate</td><td>—</td></tr>
-      <tr><td>Haversine fallback</td><td>Derives speed from distance ÷ time when the device reports no Doppler speed</td><td>—</td></tr>
-      <tr><td>Trip computer</td><td>Integrates distance, moving time, average and top speed</td><td>—</td></tr>
-      <tr><td>Alert engine</td><td>Compares speed to the limit; drives the red state and the chime</td><td>Web Audio</td></tr>
-      <tr><td>Display styles</td><td>Classic needle dial, Sport LED arc, large Digital readout and a mirrored windshield HUD, all fed by the same state</td><td>Canvas 2D</td></tr>
-      <tr><td>App shell</td><td>Drive, Trip, Settings and About screens behind a bottom tab bar; hash links keep each screen addressable while sensors keep running</td><td><code>hashchange</code></td></tr>
-      <tr><td>Drive mode</td><td>Hides everything except the dial, goes full screen and keeps the screen on</td><td>Fullscreen, Screen Wake Lock</td></tr>
-      <tr><td>Heading &amp; altitude</td><td>Compass heading from GPS course (or bearing between fixes) and altitude above sea level</td><td><code>coords.heading</code>, <code>coords.altitude</code></td></tr>
-      <tr><td>G meter &amp; 0–100 timer</td><td>Longitudinal acceleration from the filtered speed; automatic launch timer from standstill to 100 km/h (60 mph)</td><td>—</td></tr>
-      <tr><td>Trip log</td><td>Records route points, saves up to 15 trips on the phone and exports GPX or CSV</td><td><code>localStorage</code>, Blob downloads</td></tr>
-      <tr><td>Themes</td><td>Auto, Day and Night palettes with green/amber/red speed zones for at-a-glance reading</td><td>CSS tokens</td></tr>
-      <tr><td>Gauge renderer</td><td>Draws the dial, ticks, limit band and spring-damped needle on a HiDPI canvas</td><td>Canvas 2D, <code>requestAnimationFrame</code></td></tr>
-      <tr><td>Settings store</td><td>Remembers units and the limit on this device</td><td><code>localStorage</code></td></tr>
-      <tr><td>Wake lock</td><td>Stops the phone screen dimming while driving</td><td>Screen Wake Lock</td></tr>
-    </tbody>
-  </table></div>
-</section>
-
-<section id="design">
-  <h2>Design</h2>
-  <p>Data flows in one direction. The sensor runs at about 1 Hz while the screen runs at 60 fps, so the two are decoupled: fixes update the estimate, and the render loop animates toward it.</p>
-  <div class="diagram">
-    <svg viewBox="0 0 760 210" role="img" aria-label="Pipeline: permission gate, GPS, validator, Kalman filter, state, then gauge, trip computer and alerts">
-      <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
-      <g font-family="IBM Plex Sans, system-ui, sans-serif" font-size="13" fill="var(--ink)">
-        <rect x="10" y="30" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="57" text-anchor="middle">GpsSource</text>
-        <rect x="10" y="120" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="147" text-anchor="middle">Permission gate</text>
-        <rect x="170" y="75" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="230" y="102" text-anchor="middle">Validator</text>
-        <rect x="330" y="75" width="120" height="44" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="390" y="102" text-anchor="middle">Kalman filter</text>
-        <rect x="490" y="75" width="90" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="535" y="102" text-anchor="middle">State</text>
-        <rect x="620" y="14" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="39" text-anchor="middle">Gauge (60 fps)</text>
-        <rect x="620" y="77" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="102" text-anchor="middle">Trip computer</text>
-        <rect x="620" y="140" width="130" height="40" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="685" y="165" text-anchor="middle">Alerts</text>
-      </g>
-      <g stroke="var(--muted)" stroke-width="1.5" fill="none" marker-end="url(#ar)">
-        <path d="M130 52 C150 52 150 90 168 92"/><path d="M130 142 C150 142 150 104 168 102"/>
-        <path d="M290 97 H328"/><path d="M450 97 H488"/>
-        <path d="M580 92 C600 70 600 34 618 34"/><path d="M580 97 H618"/><path d="M580 102 C600 124 600 160 618 160"/>
-      </g>
-      <g font-family="IBM Plex Mono, monospace" font-size="11" fill="var(--muted)">
-        <text x="300" y="140">fix ~1 Hz</text><text x="455" y="140">speed + P</text><text x="560" y="200">rAF + spring damping</text>
-      </g>
-    </svg>
-  </div>
-  <ul>
-    <li><strong>One job per screen.</strong> Drive shows only speed, the limit sign and recording state, so a glance takes well under a second. Trip data, settings and these notes sit one tap away in the tab bar, which stays within thumb reach.</li>
-    <li><strong>One page, many screens.</strong> Screens swap inside a single page instead of loading new files, so GPS, the filter, the trip computer and recording never restart when you switch tabs.</li>
-    <li><strong>SI units inside.</strong> All maths runs in metres and seconds. Units are converted only at display time, so switching km/h ↔ mph never corrupts trip data.</li>
-    <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS today, an OBD-II adapter later).</li>
-    <li><strong>Canvas for the dial, DOM for text.</strong> The dial redraws every frame on a <code>devicePixelRatio</code>-scaled canvas; numbers stay as real text so they are crisp, selectable and readable by screen readers.</li>
-    <li><strong>Accessible at sensor rate.</strong> A polite live region announces speed every few seconds, not 60 times a second.</li>
-    <li><strong>Swappable faces.</strong> Each display style is one draw function reading the same state, so adding a new face never touches the sensor or filter code.</li>
-    <li><strong>Theme-aware.</strong> The canvas reads its colours from CSS tokens, so light and dark mode match the rest of the page.</li>
-  </ul>
-</section>
-
-<section id="principle">
-  <h2>Working principle</h2>
-  <h3>1. Measuring speed</h3>
-  <p>A phone GNSS chip measures speed from the Doppler shift of satellite signals and exposes it as <code>coords.speed</code> in m/s. This is far more accurate (typically 0.1–0.5 m/s) than differencing positions, because position error is several metres per fix. When <code>speed</code> is <code>null</code>, the app falls back to distance between two fixes divided by elapsed time, using the haversine formula:</p>
-  <div class="eq">a = sin²(Δφ/2) + cos φ₁ · cos φ₂ · sin²(Δλ/2)
-d = 2R · atan2(√a, √(1−a))      R = 6 371 000 m
-v = d / Δt</div>
-  <h3>2. Filtering noise</h3>
-  <p>Raw readings jitter. A one-dimensional Kalman filter models speed as a random walk driven by acceleration noise σ<sub>a</sub>, and weights each reading by its uncertainty r (derived from the reported accuracy):</p>
-  <div class="eq">predict:  P ← P + σa² · Δt²
-gain:     K = P / (P + r)
-update:   v ← v + K · (z − v)
-          P ← (1 − K) · P</div>
-  <p>Good fixes (small r) move the estimate quickly; poor fixes barely nudge it. Fixes with accuracy worse than 50 m are rejected outright.</p>
-  <h3>3. Moving the needle</h3>
-  <p>The estimate changes once per fix, which would make the needle jump. The render loop drives the needle with a critically damped spring, which settles fast with no overshoot:</p>
-  <div class="eq">a = ω² · (target − x) − 2ω · ẋ      ω = 6 rad/s
-ẋ ← ẋ + a · Δt
-x ← x + ẋ · Δt</div>
-  <h3>4. Trip maths</h3>
-  <p>Distance integrates the filtered speed each frame (d += v·Δt), counting only above 0.5 m/s so GPS drift while parked adds nothing. Average speed is distance over moving time, matching how car trip computers report it.</p>
-</section>
-
-<section id="build">
-  <h2>Implementation</h2>
-  <ol class="steps">
-    <li><strong>Scaffold one HTML file</strong> with a square container holding a <code>&lt;canvas&gt;</code> and an overlaid text readout. Serve it over HTTPS; browsers expose geolocation only in secure contexts.</li>
-    <li><strong>Write the sensor adapter.</strong> Wrap <code>watchPosition</code> with <code>enableHighAccuracy: true</code> and <code>maximumAge: 0</code>. Map each position to <code>{t, lat, lon, acc, speed}</code>. Handle error code 1 (denied) by locking the speedometer behind the location gate, code 2 by asking the user to turn on location services, and code 3 by showing a "searching for signal" state.
-<pre><code>watchPosition(p =&gt; onFix({
-  t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude,
-  acc: p.coords.accuracy, speed: p.coords.speed
-}), onError, { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });</code></pre></li>
-    <li><strong>Validate fixes.</strong> Drop accuracy &gt; 50 m, Δt &lt; 0.5 s for differenced speeds, and anything above 90 m/s (324 km/h).</li>
-    <li><strong>Add the Kalman filter.</strong>
-<pre><code>class SpeedKalman {
-  constructor(sigmaA = 1.2) { this.sa2 = sigmaA ** 2; this.reset(); }
-  reset() { this.x = 0; this.P = 25; this.t = null; }
-  update(z, r, t) {
-    if (this.t === null) { this.x = z; this.P = r; this.t = t; return z; }
-    const dt = Math.min(Math.max((t - this.t) / 1000, 0.001), 10);
-    this.t = t;
-    this.P += this.sa2 * dt * dt;
-    const K = this.P / (this.P + r);
-    this.x = Math.max(0, this.x + K * (z - this.x));
-    this.P *= 1 - K;
-    return this.x;
-  }
-}</code></pre></li>
-    <li><strong>Add the haversine fallback</strong> for devices that report <code>speed: null</code>; set r from the combined accuracy of both fixes divided by Δt.</li>
-    <li><strong>Build the render loop</strong> with <code>requestAnimationFrame</code>, clamping Δt to 50 ms so a backgrounded tab doesn't fling the needle when it returns.
-<pre><code>const w = 6;
-const acc = w*w*(target - x) - 2*w*v;
-v += acc * dt; x += v * dt;</code></pre></li>
-    <li><strong>Draw the dial.</strong> Size the canvas with a <code>ResizeObserver</code> to <code>clientWidth × devicePixelRatio</code>. Use a 270° sweep starting at 135°; map speed to angle with <code>start + sweep · v / max</code>. Draw the track, the over-limit band, the progress arc, minor and major ticks with labels, then the needle and hub.</li>
-    <li><strong>Add the trip computer and sparkline.</strong> Integrate distance per frame, sample speed every 500 ms into a 120-point ring buffer and plot it with the limit as a dashed line.</li>
-    <li><strong>Add alerts.</strong> When the needle passes the limit, set an <code>.over</code> class for the red state and play a short Web Audio tone every 1.5 s. Start audio only after a tap, as browsers require.</li>
-    <li><strong>Persist settings and hold the screen.</strong> Save units and limit to <code>localStorage</code> inside try/catch. Request <code>navigator.wakeLock.request('screen')</code> and re-request it on <code>visibilitychange</code>.</li>
-    <li><strong>Gate on permission.</strong> Query <code>navigator.permissions</code> for <code>geolocation</code>, start <code>watchPosition</code> on load, and lock the speedometer behind instructions while the state is denied or location services are off. Re-check on <code>permissions.onchange</code> and when the page becomes visible again. Then test on a real phone outdoors with a clear sky view.</li>
-  </ol>
-</section>
-
-<section id="deploy">
-  <h2>Deploy</h2>
-  <p>The whole app is one self-contained <code>index.html</code> with no build step and no backend. Location data never leaves the device.</p>
-  <ol class="steps">
-    <li>Rename the downloaded file to <code>index.html</code>.</li>
-    <li>Host it on any HTTPS static host: drag it onto Netlify Drop, push it to a GitHub Pages repo, or run <code>npx vercel</code> in its folder.</li>
-    <li>Open the HTTPS address on your phone and allow location when asked.</li>
-    <li>Optional: add a web app manifest and a service worker so it installs to the home screen and works offline.</li>
-  </ol>
-  <h3>Production checklist</h3>
-  <ul>
-    <li>HTTPS only; geolocation is blocked on plain HTTP.</li>
-    <li>Ask for location from a button tap, never on page load, so permission prompts have context.</li>
-    <li>Show signal state at all times: waiting, weak (accuracy shown), lost after 5 s without a fix.</li>
-    <li>iOS Safari pauses location when the screen locks; the wake lock keeps it running.</li>
-    <li>GPS speed lags reality by roughly 0.5–1 s. Treat this as a driver aid, not a calibrated instrument.</li>
-  </ul>
-</section>
+    <div class="pagehead"><div><div class="eyebrow">Version 3.0</div><h1>About Pacer</h1></div></div>
+    <section>
+      <p>Pacer turns your phone's GPS into a speedometer. It runs in the browser, works offline once loaded, and never sends your location anywhere.</p>
+    </section>
+    <section>
+      <h2>How speed is measured</h2>
+      <ul>
+        <li><strong>Doppler speed first.</strong> Phones measure speed from the Doppler shift of satellite signals. It is accurate to a few tenths of a km/h and is used whenever the phone provides it.</li>
+        <li><strong>Position fallback.</strong> If a phone gives no Doppler speed, Pacer divides the distance between two good fixes (both within 25 m) by the time between them, and marks the signal as weak.</li>
+        <li><strong>Filtering.</strong> A small Kalman filter smooths the readings without adding noticeable delay. One wild reading is ignored; two in a row are trusted, so hard braking still shows immediately.</li>
+        <li><strong>Standing still reads 0.</strong> GPS drifts by 1–3 km/h when parked. Pacer shows 0 until it has three readings above 3 km/h, or one above 9 km/h.</li>
+        <li><strong>No fake readings.</strong> Until the first usable fix, or after 4 s without one, the speed shows "––" instead of 0 or a frozen number.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Distance and trip time</h2>
+      <ul>
+        <li>Distance adds up speed × time between GPS fixes. Summing the distance between raw positions overcounts, because the position jitters by several metres even when parked.</li>
+        <li>Short gaps (up to 5 s) are filled from speed. Longer gaps of up to 60 s, such as a tunnel, use the straight line between the fixes on either side. That slightly undercounts curved roads.</li>
+        <li>Elapsed time counts while Pacer is receiving GPS. Moving time counts only while you're above about 2 km/h.</li>
+      </ul>
+    </section>
+    <section>
+      <h2>Validation</h2>
+      <p>The measurement engine is tested against simulated GPS traces with known true speed and distance. The tests run at 1 reading per second with realistic noise. Results from the current version:</p>
+      <div class="tbl"><table>
+        <thead><tr><th>Scenario</th><th>Result</th></tr></thead>
+        <tbody>
+          <tr><td>Parked for 5 minutes</td><td class="r">0 km/h shown 100% of the time, 0 m added</td></tr>
+          <tr><td>Cruising at 90 km/h</td><td class="r">bias −0.03 km/h, jitter ±0.85 km/h</td></tr>
+          <tr><td>Accelerating at 3 m/s²</td><td class="r">no measurable lag at fix times</td></tr>
+          <tr><td>20-minute mixed drive, distance</td><td class="r">−0.04% (summing positions: +6.8%)</td></tr>
+          <tr><td>25 s tunnel</td><td class="r">speed hidden, distance −0.6%</td></tr>
+          <tr><td>One bad reading (+65 km/h)</td><td class="r">needle moved 1.9 km/h</td></tr>
+          <tr><td>0–100 km/h, true 9.26 s</td><td class="r">9.25 s, marked reliable</td></tr>
+          <tr><td>Hovering at the limit ±1 km/h</td><td class="r">1 alert in 60 s</td></tr>
+        </tbody>
+      </table></div>
+      <p class="muted" style="font-size:14px">These numbers are from simulated traces. Real phones vary, so treat Pacer as a driver aid, not a calibrated instrument. Your car's speedometer usually reads a few percent high by design.</p>
+    </section>
+    <section>
+      <h2>0–100 timing</h2>
+      <p>The timer arms after you've been stopped for 1.5 s. The start is the moment the car leaves zero, estimated from the first two moving readings. The finish is interpolated between the readings either side of 100 km/h (60 mph in mph). A run is marked <em>rough</em> if the GPS skipped a reading or was imprecise. At one reading per second, expect about ±0.5 s.</p>
+    </section>
+    <section>
+      <h2>Privacy</h2>
+      <p>Everything stays on this phone. Settings, the current trip and saved trips are kept in the browser's local storage. Clearing your browser data, or <em>Delete all</em> in Settings, removes them.</p>
+    </section>
   </section>
 
   <nav class="tabs" aria-label="Main">
-    <a href="#drive" data-to="drive" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="M12 13.5l4-5"/><circle cx="12" cy="14" r="1.2"/></svg><span class="live" id="tabDrive">Drive</span></a>
-    <a href="#trip" data-to="trip"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg><span>Trip</span></a>
-    <a href="#settings" data-to="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Settings</span></a>
-    <a href="#about" data-to="about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span></a>
+    <a href="#drive" data-to="drive" aria-current="page"><svg class="i"><use href="#i-gauge"/></svg><span class="live" id="tabDrive">Drive</span></a>
+    <a href="#trip" data-to="trip"><svg class="i"><use href="#i-route"/></svg><span>Trip</span></a>
+    <a href="#settings" data-to="settings"><svg class="i"><use href="#i-sliders"/></svg><span>Settings</span></a>
+    <a href="#about" data-to="about"><svg class="i"><use href="#i-info"/></svg><span>About</span></a>
   </nav>
+  <div class="toast" id="toast" hidden role="status" aria-live="polite"></div>
 </div>
 
+<script src="engine.js"></script>
 <script>
 (() => {
   "use strict";
   const $ = s => document.querySelector(s);
-  const root = document.getElementById("app");
+  const $$ = s => document.querySelectorAll(s);
+  const root = $("#app");
   const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const { Engine, OverspeedMonitor } = window.PacerEngine;
 
-  // ---------- Units (internal SI: m/s, m) ----------
+  // =====================================================================
+  // Units and persistent settings
+  // =====================================================================
   const UNITS = {
-    kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km",  df: 0.001 },
-    mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi",  df: 0.000621371 },
-    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km",  df: 0.001 },
-    kn:  { label: "kn",   f: 1.943844, max: 140, major: 20, minor: 5,   dist: "nmi", df: 0.000539957 }
+    kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km",  df: 0.001,       step: 5, band: 20, bands: 8 },
+    mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi",  df: 0.000621371, step: 5, band: 10, bands: 8 },
+    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km",  df: 0.001,       step: 1, band: 5,  bands: 8 },
+    kn:  { label: "kn",   f: 1.943844, max: 140, major: 20, minor: 5,   dist: "nmi", df: 0.000539957, step: 5, band: 10, bands: 8 }
   };
   const STYLES = ["classic", "sport", "digital", "hud"];
-  const STYLE_NAMES = { classic: "Classic", sport: "Sport", digital: "Digital", hud: "HUD" };
-
-  // ---------- Settings store ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem("pacer." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
-    set(k, v) { try { localStorage.setItem("pacer." + k, JSON.stringify(v)); } catch {} }
+    set(k, v) { try { localStorage.setItem("pacer." + k, JSON.stringify(v)); return true; } catch { return false; } },
+    del(k) { try { localStorage.removeItem("pacer." + k); } catch {} }
   };
   const pick = (k, d, ok) => { const v = store.get(k, d); return ok(v) ? v : d; };
-
-  // ---------- State ----------
-  const state = {
+  const S = {
     unit: pick("unit", "kmh", v => !!UNITS[v]),
-    limitMs: pick("limitMs", 100 / 3.6, v => typeof v === "number" && v > 0),
+    limitMs: pick("limitMs", 100 / 3.6, v => typeof v === "number" && v > 0 && v < 100),
     style: pick("style", "classic", v => STYLES.includes(v)),
     mirror: store.get("mirror", false) === true,
-    est: 0, shown: 0, vel: 0, lastRecv: 0, acc: null,
-    trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
-    hist: [], sound: false,
-    hdg: null, alt: null, accel: 0, lastEst: 0, lastEstT: 0,
-    launch: { armed: false, t0: null, last: null, best: null }
+    tol: pick("tol", 0, v => [0, 0.05, 0.1].includes(v)),
+    alertOn: store.get("alertOn", false) === true,
+    theme: pick("theme", "auto", v => ["auto", "light", "dark"].includes(v))
   };
+  const U = () => UNITS[S.unit];
 
-  // ---------- Estimator ----------
-  class SpeedKalman {
-    constructor(sigmaA = 1.2) { this.sa2 = sigmaA * sigmaA; this.reset(); }
-    reset() { this.x = 0; this.P = 25; this.t = null; }
-    update(z, r, t) {
-      if (this.t === null) { this.x = z; this.P = r; this.t = t; return z; }
-      const dt = Math.min(Math.max((t - this.t) / 1000, 0.001), 10);
-      this.t = t;
-      this.P += this.sa2 * dt * dt;
-      const K = this.P / (this.P + r);
-      this.x = Math.max(0, this.x + K * (z - this.x));
-      this.P *= 1 - K;
-      return this.x;
-    }
-  }
-  const kf = new SpeedKalman();
+  // =====================================================================
+  // Measurement: engine + GPS source
+  // =====================================================================
+  const engine = new Engine();
+  const overspeed = new OverspeedMonitor();
+  engine.importTrip(store.get("trip", null));
+  const setLaunchTarget = () => engine.launch.setTarget(S.unit === "mph" ? 60 / 2.236936 : 100 / 3.6);
+  setLaunchTarget();
 
-  const toRad = d => d * Math.PI / 180;
-  function haversine(a, b) {
-    const R = 6371000, dφ = toRad(b.lat - a.lat), dλ = toRad(b.lon - a.lon);
-    const h = Math.sin(dφ / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dλ / 2) ** 2;
-    return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
+  let watchId = null, gotFirst = false;
+  function stopGps() { if (watchId !== null) { try { navigator.geolocation.clearWatch(watchId); } catch {} } watchId = null; }
+  function startGps() {
+    if (!window.isSecureContext) return setGate("insecure");
+    if (!("geolocation" in navigator)) return setGate("unsupported");
+    stopGps();
+    engine.start();
+    try {
+      watchId = navigator.geolocation.watchPosition(onPosition, onPositionError, { enableHighAccuracy: true, maximumAge: 0, timeout: 20000 });
+    } catch { setGate("unsupported"); }
   }
-  function bearing(a, b) {
-    const φ1 = toRad(a.lat), φ2 = toRad(b.lat), dλ = toRad(b.lon - a.lon);
-    const y = Math.sin(dλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
-    return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+  function onPosition(p) {
+    gotFirst = true;
+    if (gateKind) setGate(null);
+    const c = p.coords;
+    const res = engine.ingest({ t: p.timestamp, lat: c.latitude, lon: c.longitude, acc: c.accuracy, speed: c.speed, heading: c.heading, alt: c.altitude }, Date.now());
+    if (res.ok) recordPoint(p, res);
   }
-  const compass = h => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(h / 45) % 8];
-
-  // ---------- Trip recorder + derived metrics ----------
-  const rec = { on: false, points: [], start: 0, trip0: null };
-  function afterEstimate(f) {
-    const dt = state.lastEstT ? (f.t - state.lastEstT) / 1000 : 0;
-    if (dt > 0.05 && dt < 5) state.accel += 0.5 * ((state.est - state.lastEst) / dt - state.accel);
-    state.lastEst = state.est; state.lastEstT = f.t;
-    const L = state.launch, target = state.unit === "mph" ? 26.8224 : 27.7778;
-    if (state.est < 0.5) { L.armed = true; L.t0 = null; }
-    else if (L.armed && L.t0 === null) L.t0 = f.t;
-    if (L.armed && L.t0 !== null) {
-      if (state.est >= target) { L.last = (f.t - L.t0) / 1000; L.best = L.best ? Math.min(L.best, L.last) : L.last; L.armed = false; L.t0 = null; }
-      else if (f.t - L.t0 > 60000) { L.armed = false; L.t0 = null; }
-    }
-    if (rec.on && f.lat != null) rec.points.push([f.t, +f.lat.toFixed(6), +f.lon.toFixed(6), Number.isFinite(f.alt) ? Math.round(f.alt * 10) / 10 : null, Math.round(state.est * 100) / 100]);
+  function onPositionError(e) {
+    if (e.code === 1) { stopGps(); setGate("denied"); }
+    else if (e.code === 2 && !gotFirst) setGate("off");
+    else if (gateKind === "requesting") setGate(null);
   }
 
-  const MAX_ACC = 50, MAX_SPEED = 90;
-  let prevFix = null;
-  function onFix(f) {
-    state.lastRecv = performance.now();
-    state.acc = f.acc;
-    if (f.acc != null && f.acc > MAX_ACC) { setStatus("bad", "Weak signal · ±" + Math.round(f.acc) + " m"); return; }
-    let z = null, r = 1;
-    if (Number.isFinite(f.speed) && f.speed >= 0) {
-      z = f.speed; r = Math.pow(0.3 + (f.acc || 5) / 25, 2);
-    } else if (prevFix && f.lat != null) {
-      const dt = (f.t - prevFix.t) / 1000;
-      if (dt >= 0.5) {
-        z = haversine(prevFix, f) / dt;
-        const e = Math.hypot(prevFix.acc || 10, f.acc || 10) / dt; r = e * e;
-      }
-    }
-    if (f.lat != null) {
-      if (Number.isFinite(f.heading) && (f.speed == null || f.speed > 0.8)) state.hdg = f.heading;
-      else if (prevFix && haversine(prevFix, f) > 5) state.hdg = bearing(prevFix, f);
-    }
-    if (Number.isFinite(f.alt)) state.alt = f.alt;
-    if (f.lat != null) prevFix = f;
-    if (z === null || z > MAX_SPEED) return;
-    state.est = kf.update(z, r, f.t);
-    afterEstimate(f);
-    setStatus("ok", "GPS · ±" + Math.round(f.acc || 0) + " m");
-  }
-
-  // ---------- Sources ----------
-  class GpsSource {
-    start(onFix, onErr) {
-      if (!("geolocation" in navigator)) return onErr(1, "This browser has no location support.");
-      try {
-        this.id = navigator.geolocation.watchPosition(
-          p => onFix({ t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading, alt: p.coords.altitude }),
-          e => onErr(e.code, e.code === 1 ? "Location permission was refused." : e.code === 3 ? "Still waiting for a GPS fix." : "Position unavailable. Move to open sky."),
-          { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-      } catch { onErr(1, "Location is blocked here."); }
-    }
-    stop() { if (this.id != null) { try { navigator.geolocation.clearWatch(this.id); } catch {} } this.id = null; }
-  }
-
-
-  // ---------- Location gate ----------
+  // =====================================================================
+  // Location gate
+  // =====================================================================
   const UA = navigator.userAgent;
   const PLATFORM = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(UA) ? "android" : "desktop";
+  const PLATFORM_NAME = { ios: "On iPhone or iPad", android: "On Android", desktop: "On this computer" };
   const STEPS = {
     denied: {
       ios: ["Tap <b>aA</b> in Safari's address bar, then <b>Website Settings → Location → Allow</b>.",
             "Still blocked? Open <b>Settings → Privacy &amp; Security → Location Services → Safari Websites</b> and choose <b>While Using the App</b>. In Chrome, use <b>Settings → Chrome → Location</b>.",
             "Come back here and tap <b>Try again</b>."],
       android: ["Tap the icon to the left of the address bar, then <b>Permissions → Location → Allow</b>.",
-                "Check that <b>Location</b> is on in your phone's quick settings (swipe down from the top).",
+                "Check that <b>Location</b> is on in quick settings (swipe down from the top of the screen).",
                 "Tap <b>Try again</b>. If nothing changes, reload the page."],
-      desktop: ["Click the icon to the left of the address bar and set <b>Location</b> to <b>Allow</b>.",
-                "Reload the page."]
+      desktop: ["Click the icon to the left of the address bar and set <b>Location</b> to <b>Allow</b>.", "Reload the page."]
     },
     off: {
       ios: ["Open <b>Settings → Privacy &amp; Security → Location Services</b> and turn it on.",
             "In the same list, set <b>Safari Websites</b> (or Chrome) to <b>While Using the App</b>.",
             "Come back here and tap <b>Try again</b>."],
-      android: ["Swipe down from the top of the screen and turn on <b>Location</b>.",
-                "Go outdoors or near a window so GPS can get a fix.",
-                "Tap <b>Try again</b>."],
-      desktop: ["Turn on location services in your computer's privacy settings.",
-                "Reload the page."]
+      android: ["Swipe down from the top of the screen and turn on <b>Location</b>.", "Go outdoors or near a window so GPS can find you.", "Tap <b>Try again</b>."],
+      desktop: ["Turn on location services in your computer's privacy settings.", "Reload the page."]
     }
   };
-  const PLATFORM_NAME = { ios: "On iPhone / iPad", android: "On Android", desktop: "On this computer" };
   let gateKind = null;
   function setGate(kind) {
     gateKind = kind;
     const g = $("#gate"), on = !!kind;
-    document.body.classList.toggle("gated", on);
+    root.classList.toggle("gated", on);
     g.hidden = !on;
-    $(".stage").inert = on; $(".dock").inert = on;
+    for (const sel of [".stage", ".secondary", ".controls"]) $(sel).inert = on;
     if (!on) return;
     g.dataset.kind = kind;
-    const secureUrl = "https://" + location.host + location.pathname;
+    const secure = "https://" + location.host + location.pathname;
     const copy = {
       requesting: ["Allow location to start", "Pacer reads your speed from your phone's GPS. Tap Allow when your browser asks.", "Enable location"],
       denied: ["Location is blocked", "Pacer can't show your speed until this site is allowed to use your location.", "Try again"],
       off: ["Turn on location services", "Your phone's location is switched off, or it can't find a position yet.", "Try again"],
-      insecure: ["Open the secure link", location.protocol === "http:" ? "Location only works over HTTPS. Open " + secureUrl : "Location only works when the page is opened from an HTTPS web address, not from a saved file.", "Open secure link"],
-      unsupported: ["Location isn't supported", "This browser can't share your location. Open Pacer in Safari or Chrome.", ""]
+      insecure: ["Open the secure link", location.protocol === "http:" ? "Location only works over HTTPS. Open " + secure : "Location only works when Pacer is opened from its https:// web address, not from a saved file.", location.protocol === "http:" ? "Open secure link" : ""],
+      unsupported: ["Location isn't available", "This browser can't share your location. Open Pacer in Safari or Chrome.", ""]
     }[kind];
     $("#gateTitle").textContent = copy[0];
     $("#gateText").textContent = copy[1];
     $("#gateBtn").textContent = copy[2];
-    $("#gateBtn").hidden = !copy[2] || (kind === "insecure" && location.protocol !== "http:");
+    $("#gateBtn").hidden = !copy[2];
     const steps = STEPS[kind]?.[PLATFORM];
-    $("#gateSteps").innerHTML = steps ? `<div class="platform">${PLATFORM_NAME[PLATFORM]}</div><ol>${steps.map(x => `<li>${x}</li>`).join("")}</ol>` : "";
+    $("#gateSteps").innerHTML = steps ? `<div class="eyebrow platform">${PLATFORM_NAME[PLATFORM]}</div><ol>${steps.map(x => `<li>${x}</li>`).join("")}</ol>` : "";
     $("#gateReload").hidden = !(kind === "denied" || kind === "off");
-    setStatus(kind === "requesting" ? "wait" : "bad", kind === "requesting" ? "Waiting for permission" : "Location needed");
-  }
-
-  let source = null, gotFirst = false;
-  function startGps() {
-    if (!window.isSecureContext) return setGate("insecure");
-    if (!("geolocation" in navigator)) return setGate("unsupported");
-    if (source) source.stop();
-    kf.reset(); prevFix = null; state.est = 0; state.hdg = null; gotFirst = false;
-    source = new GpsSource();
-    source.start(f => {
-      gotFirst = true;
-      if (gateKind) setGate(null);
-      onFix(f);
-    }, code => {
-      if (code === 1) setGate("denied");
-      else if (code === 2 && !gotFirst) setGate("off");
-      else if (code === 2) setStatus("bad", "Signal lost");
-      else { if (gateKind === "requesting") setGate(null); setStatus("wait", "Searching for GPS signal"); }
-    });
-    if (!gotFirst) setStatus("wait", "Searching for GPS signal");
-  }
-  async function bootLocation() {
-    let perm = null;
-    try { perm = await navigator.permissions?.query({ name: "geolocation" }); } catch {}
-    if (perm) {
-      if (perm.state === "prompt") setGate("requesting");
-      else if (perm.state === "denied") setGate("denied");
-      perm.onchange = () => { if (perm.state === "granted") startGps(); else if (perm.state === "denied") setGate("denied"); };
-    } else setGate("requesting");
-    if (!perm || perm.state !== "denied") startGps();
   }
   $("#gateBtn").onclick = () => {
     if (gateKind === "insecure") { location.href = "https://" + location.host + location.pathname; return; }
     setGate("requesting"); startGps();
   };
   $("#gateReload").onclick = () => location.reload();
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (gateKind === "denied" || gateKind === "off")) startGps(); });
-  function setStatus(s, text) { $("#status").dataset.s = s; $("#statusText").textContent = text; }
+  async function bootLocation() {
+    let perm = null;
+    try { perm = await navigator.permissions?.query({ name: "geolocation" }); } catch {}
+    if (perm) {
+      if (perm.state === "prompt") setGate("requesting");
+      else if (perm.state === "denied") setGate("denied");
+      perm.onchange = () => { if (perm.state === "granted" && gateKind) startGps(); else if (perm.state === "denied") { stopGps(); setGate("denied"); } };
+    } else setGate("requesting");
+    if (!perm || perm.state !== "denied") startGps();
+  }
 
-  // ---------- Theme tokens for canvas ----------
+  // =====================================================================
+  // Rendering helpers
+  // =====================================================================
   const T = {};
+  let themeRev = 0;
   function readTokens() {
     const cs = getComputedStyle(document.documentElement);
-    ["ink", "muted", "line", "accent", "alert", "needle", "face", "panel", "alert-soft", "accent-soft", "ok"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
+    ["ink", "muted", "line", "accent", "alert", "needle", "face", "surface", "sunk", "alert-soft", "accent-soft", "ok", "warn"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
+    themeRev++;
   }
   readTokens();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", readTokens);
   new MutationObserver(readTokens).observe(document.documentElement, { attributes: true, attributeFilter: ["data-theme"] });
 
-  // ---------- HiDPI canvases ----------
   function hidpi(canvas) {
-    const o = { canvas, ctx: canvas.getContext("2d"), w: 0, h: 0, dpr: 1 };
+    const o = { canvas, ctx: canvas.getContext("2d"), w: 0, h: 0, dpr: 1, rev: 0 };
     const fit = () => {
       const r = canvas.getBoundingClientRect();
-      o.dpr = Math.min(window.devicePixelRatio || 1, 3); o.w = r.width; o.h = r.height;
+      o.dpr = Math.min(window.devicePixelRatio || 1, 3); o.w = r.width; o.h = r.height; o.rev++;
       canvas.width = Math.round(r.width * o.dpr); canvas.height = Math.round(r.height * o.dpr);
     };
     new ResizeObserver(fit).observe(canvas); fit();
     return o;
   }
-  const G = hidpi($("#gauge")), S = hidpi($("#spark"));
-  const DISPLAY_FONT = '"Saira Condensed","Arial Narrow",sans-serif', MONO_FONT = '"IBM Plex Mono",ui-monospace,monospace';
+  const G = hidpi($("#gauge")), C = hidpi($("#chart"));
+  const DISPLAY = '"Saira Condensed","Arial Narrow",sans-serif', MONO = '"IBM Plex Mono",ui-monospace,monospace';
+  function prep(o) { const { ctx, w, h, dpr } = o; ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h); return ctx; }
 
-  function prep() {
-    const { ctx, w, h, dpr } = G;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-    return { ctx, w, h, U: UNITS[state.unit] };
-  }
-  function drawGauge() {
-    if (!G.w) return;
-    ({ classic: drawClassic, sport: drawSport, digital: drawDigital, hud: drawHud })[state.style]();
-  }
-  function roundBar(ctx, x, y, w, h) {
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
-  }
+  // Gauge face colours follow the alert zones: normal, near (≥90%), over.
+  const zoneColor = (vU, limU) => vU > limU * (1 + S.tol) ? T.alert : vU >= limU * 0.9 ? T.warn : T.accent;
 
-  // Classic: needle dial with a zone-coloured progress arc and a top-speed telltale
+  // ---- Classic: legible analogue gauge, solid zone-coloured arc, red band past the limit ----
   const A0 = 0.75 * Math.PI, SWEEP = 1.5 * Math.PI;
-  function drawClassic() {
-    const { ctx, w, h, U } = prep();
-    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 6;
-    const ang = v => A0 + SWEEP * Math.min(Math.max(v / U.max, 0), 1);
-    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
-
-    const fg = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
-    fg.addColorStop(0, T.panel); fg.addColorStop(1, T.face);
-    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = fg; ctx.fill();
+  function drawClassic(d) {
+    const ctx = prep(G), { w, h } = G, u = U();
+    const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 4;
+    const ang = v => A0 + SWEEP * Math.min(Math.max(v / u.max, 0), 1);
+    const limU = S.limitMs * u.f;
+    ctx.globalAlpha = d.has ? 1 : 0.4;
+    ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = T.face; ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = T.line; ctx.stroke();
-
-    const rr = R * 0.86, bw = Math.max(6, R * 0.05);
-    ctx.lineCap = "butt"; ctx.lineWidth = bw; ctx.strokeStyle = T.line;
-    ctx.beginPath(); ctx.arc(cx, cy, rr, A0, A0 + SWEEP); ctx.stroke();
-    if (limU < U.max) { ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke(); }
-    if (shownU > 0.05) {
-      let stroke = shownU > limU ? T.alert : T.accent;
-      if (ctx.createConicGradient) {
-        const cg = ctx.createConicGradient(A0, cx, cy), q = v => Math.min(Math.max(v / U.max, 0), 1) * 0.75;
-        cg.addColorStop(0, T.ok); cg.addColorStop(q(limU * 0.75), T.ok); cg.addColorStop(q(limU * 0.9), T.accent);
-        cg.addColorStop(q(limU), T.alert); cg.addColorStop(1, T.alert);
-        stroke = cg;
-      }
-      ctx.save();
-      ctx.shadowColor = shownU > limU ? T.alert : T.accent; ctx.shadowBlur = R * 0.06;
-      ctx.strokeStyle = stroke; ctx.lineCap = "round";
-      ctx.beginPath(); ctx.arc(cx, cy, rr, A0, ang(shownU)); ctx.stroke();
-      ctx.restore();
-    }
-    if (state.trip.max * U.f > 1) {
-      const am = ang(state.trip.max * U.f);
-      ctx.save(); ctx.translate(cx + Math.cos(am) * (rr + bw), cy + Math.sin(am) * (rr + bw)); ctx.rotate(am);
-      ctx.fillStyle = T.muted; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 0.045, -R * 0.025); ctx.lineTo(R * 0.045, R * 0.025); ctx.closePath(); ctx.fill();
-      ctx.restore();
-    }
-
-    const tickOut = rr - bw / 2 - 4, fs = Math.max(11, R * 0.085);
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.font = `600 ${fs}px ${DISPLAY_FONT}`;
-    for (let v = 0; v <= U.max + 1e-6; v += U.minor) {
-      const a = ang(v), major = Math.abs(v / U.major - Math.round(v / U.major)) < 1e-6;
-      const len = major ? R * 0.09 : R * 0.04;
+    const rr = R * 0.88, bw = Math.max(6, R * 0.045);
+    ctx.lineCap = "butt"; ctx.lineWidth = bw;
+    ctx.strokeStyle = T.line; ctx.beginPath(); ctx.arc(cx, cy, rr, A0, A0 + SWEEP); ctx.stroke();
+    if (limU < u.max) { ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke(); }
+    if (d.has && d.vU > 0.05) { ctx.strokeStyle = zoneColor(d.vU, limU); ctx.beginPath(); ctx.arc(cx, cy, rr, A0, ang(d.vU)); ctx.stroke(); }
+    // ticks: minor every `minor`, major + label every `major`; labels sit inside the ticks
+    const tickOut = rr - bw / 2 - 3, fs = Math.max(11, R * 0.082);
+    ctx.font = `600 ${fs}px ${DISPLAY}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= u.max + 1e-6; v += u.minor) {
+      const a = ang(v), major = Math.abs(v / u.major - Math.round(v / u.major)) < 1e-6;
+      const len = major ? R * 0.085 : R * 0.035;
       ctx.lineWidth = major ? 2 : 1;
-      ctx.strokeStyle = v >= limU ? T.alert : (major ? T.ink : T.muted);
-      ctx.beginPath();
-      ctx.moveTo(cx + Math.cos(a) * tickOut, cy + Math.sin(a) * tickOut);
-      ctx.lineTo(cx + Math.cos(a) * (tickOut - len), cy + Math.sin(a) * (tickOut - len));
-      ctx.stroke();
+      ctx.strokeStyle = v > limU ? T.alert : major ? T.ink : T.muted;
+      ctx.beginPath(); ctx.moveTo(cx + Math.cos(a) * tickOut, cy + Math.sin(a) * tickOut); ctx.lineTo(cx + Math.cos(a) * (tickOut - len), cy + Math.sin(a) * (tickOut - len)); ctx.stroke();
       if (major) {
-        const lr = tickOut - len - fs * 0.95;
-        ctx.fillStyle = v >= limU ? T.alert : T.ink;
+        const lr = tickOut - len - fs * 0.9;
+        ctx.fillStyle = v > limU ? T.alert : T.ink;
         ctx.fillText(String(v), cx + Math.cos(a) * lr, cy + Math.sin(a) * lr);
       }
     }
-    if (limU < U.max) {
-      const a = ang(limU);
-      ctx.fillStyle = T.alert;
-      ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (rr + bw), cy + Math.sin(a) * (rr + bw), Math.max(3, R * 0.018), 0, Math.PI * 2); ctx.fill();
+    // top-speed telltale
+    if (d.maxU > 1) {
+      const am = ang(d.maxU);
+      ctx.save(); ctx.translate(cx + Math.cos(am) * (rr + bw * 0.9), cy + Math.sin(am) * (rr + bw * 0.9)); ctx.rotate(am);
+      ctx.fillStyle = T.muted; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 0.04, -R * 0.022); ctx.lineTo(R * 0.04, R * 0.022); ctx.closePath(); ctx.fill(); ctx.restore();
     }
-    const a = ang(shownU), nl = R * 0.74;
-    ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
-    ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = R * 0.03; ctx.shadowOffsetY = R * 0.008;
-    ctx.fillStyle = T.needle;
-    ctx.beginPath(); ctx.moveTo(-R * 0.12, -R * 0.018); ctx.lineTo(nl, -1.2); ctx.lineTo(nl, 1.2); ctx.lineTo(-R * 0.12, R * 0.018); ctx.closePath(); ctx.fill();
-    ctx.restore();
-    ctx.beginPath(); ctx.arc(cx, cy, R * 0.055, 0, Math.PI * 2); ctx.fillStyle = T.ink; ctx.fill();
-    ctx.beginPath(); ctx.arc(cx, cy, R * 0.022, 0, Math.PI * 2); ctx.fillStyle = T.needle; ctx.fill();
+    // needle (hidden without data)
+    if (d.has) {
+      const a = ang(d.vU), nl = R * 0.76;
+      ctx.save(); ctx.translate(cx, cy); ctx.rotate(a); ctx.fillStyle = T.needle;
+      ctx.beginPath(); ctx.moveTo(-R * 0.06, -R * 0.014); ctx.lineTo(nl, -1.1); ctx.lineTo(nl, 1.1); ctx.lineTo(-R * 0.06, R * 0.014); ctx.closePath(); ctx.fill(); ctx.restore();
+    }
+    ctx.beginPath(); ctx.arc(cx, cy, R * 0.035, 0, Math.PI * 2); ctx.fillStyle = T.ink; ctx.fill();
+    ctx.globalAlpha = 1;
   }
 
-  // Sport: segmented LED arc, green → amber → red relative to the limit
-  function drawSport() {
-    const { ctx, w, h, U } = prep();
-    const cx = w / 2, cy = h * 0.56, R = Math.min(w * 0.44, h * 0.48);
-    const s = Math.PI * 160 / 180, sweep = Math.PI * 220 / 180, N = 44, gap = 0.012;
-    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
-    ctx.lineWidth = R * 0.15; ctx.lineCap = "butt";
+  // ---- Sport: thick LED ring with green/amber/red segments, heavy slanted numerals ----
+  function drawSport(d) {
+    const ctx = prep(G), { w, h } = G, u = U();
+    const cx = w / 2, cy = h * 0.52, R = Math.min(w, h) * 0.47;
+    const s0 = Math.PI * 0.75, sweep = Math.PI * 1.5, N = 40, gap = 0.014;
+    const limU = S.limitMs * u.f;
+    ctx.globalAlpha = d.has ? 1 : 0.4;
+    ctx.lineWidth = R * 0.17; ctx.lineCap = "butt";
     for (let i = 0; i < N; i++) {
-      const v0 = U.max * i / N, lit = v0 < shownU - 1e-6;
-      const col = v0 >= limU ? T.alert : v0 >= limU * 0.8 ? T.accent : T.ok;
-      ctx.strokeStyle = lit ? col : (v0 >= limU ? T["alert-soft"] : T.line);
-      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, s + sweep * i / N + gap, s + sweep * (i + 1) / N - gap); ctx.stroke();
+      const v0 = u.max * i / N, lit = d.has && v0 < d.vU - 1e-6;
+      const col = v0 > limU * (1 + S.tol) ? T.alert : v0 >= limU * 0.9 ? T.warn : T.ok;
+      ctx.strokeStyle = lit ? col : v0 > limU ? T["alert-soft"] : T.line;
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.86, s0 + sweep * i / N + gap, s0 + sweep * (i + 1) / N - gap); ctx.stroke();
     }
-    const fs = Math.max(11, R * 0.08);
-    ctx.font = `600 ${fs}px ${DISPLAY_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    for (let v = 0; v <= U.max + 1e-6; v += U.major * 2) {
-      const a = s + sweep * v / U.max;
-      ctx.fillStyle = v >= limU ? T.alert : T.muted;
-      ctx.fillText(String(v), cx + Math.cos(a) * R * 1.03, cy + Math.sin(a) * R * 1.03);
+    // scale: 0, limit, max only, to keep the ring uncluttered
+    const fs = Math.max(12, R * 0.085);
+    ctx.font = `700 ${fs}px ${DISPLAY}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    const lab = (v, col) => { const a = s0 + sweep * Math.min(v / u.max, 1); ctx.fillStyle = col; ctx.fillText(String(Math.round(v)), cx + Math.cos(a) * R * 0.62, cy + Math.sin(a) * R * 0.62); };
+    lab(0, T.muted); lab(u.max, T.muted);
+    if (limU < u.max) {
+      const a = s0 + sweep * limU / u.max, rO = R * 0.86 + R * 0.105;
+      ctx.save(); ctx.translate(cx + Math.cos(a) * rO, cy + Math.sin(a) * rO); ctx.rotate(a);
+      ctx.fillStyle = T.alert; ctx.beginPath(); ctx.moveTo(0, 0); ctx.lineTo(R * 0.05, -R * 0.03); ctx.lineTo(R * 0.05, R * 0.03); ctx.closePath(); ctx.fill(); ctx.restore();
     }
-    ctx.fillStyle = T.muted; ctx.font = `500 ${Math.max(11, R * 0.06)}px ${MONO_FONT}`;
-    ctx.fillText(`MAX ${Math.round(state.trip.max * U.f)}  ·  TRIP ${(state.trip.dist * U.df).toFixed(1)} ${U.dist.toUpperCase()}`, cx, h * 0.9);
+    // gear-indicator-style top speed under the number
+    ctx.font = `500 ${Math.max(11, R * 0.065)}px ${MONO}`; ctx.fillStyle = T.muted;
+    ctx.fillText(`TOP ${Math.round(d.maxU)}`, cx, h * 0.84);
+    ctx.globalAlpha = 1;
   }
 
-  // Digital: huge number (DOM) with a linear bar and three key figures
-  function drawDigital() {
-    const { ctx, w, h, U } = prep();
-    const x0 = w * 0.08, x1 = w * 0.92, y = h * 0.66, bh = Math.max(10, h * 0.035);
-    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
-    const X = v => x0 + (x1 - x0) * Math.min(Math.max(v / U.max, 0), 1);
-    roundBar(ctx, x0, y, x1 - x0, bh); ctx.fillStyle = T.line; ctx.fill();
-    if (shownU > 0.05) { roundBar(ctx, x0, y, Math.max(bh, X(shownU) - x0), bh); ctx.fillStyle = shownU > limU ? T.alert : T.accent; ctx.fill(); }
-    if (limU < U.max) { ctx.fillStyle = T.alert; ctx.fillRect(X(limU) - 1, y - 6, 2, bh + 12); }
-    ctx.font = `500 ${Math.max(11, w * 0.027)}px ${MONO_FONT}`; ctx.fillStyle = T.muted; ctx.textBaseline = "top";
-    [[0, "left"], [U.max / 2, "center"], [U.max, "right"]].forEach(([v, al]) => { ctx.textAlign = al; ctx.fillText(String(v), X(v), y + bh + 8); });
-    const items = [["LIMIT", Math.round(limU)], ["TOP", Math.round(state.trip.max * U.f)], ["AVG", state.trip.moving > 1 ? Math.round(state.trip.dist / state.trip.moving * U.f) : 0]];
-    items.forEach(([k, v], i) => {
-      const cx = w * (0.2 + 0.3 * i);
-      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = T.muted; ctx.font = `500 ${Math.max(10, w * 0.025)}px ${MONO_FONT}`; ctx.fillText(k, cx, h * 0.84);
-      ctx.fillStyle = k === "LIMIT" ? T.alert : T.ink; ctx.font = `600 ${Math.max(18, w * 0.065)}px ${DISPLAY_FONT}`; ctx.fillText(String(v), cx, h * 0.95);
-    });
+  // ---- Digital: the number is the instrument; a single slim bar for context ----
+  function drawDigital(d) {
+    const ctx = prep(G), { w, h } = G, u = U();
+    const x0 = w * 0.1, x1 = w * 0.9, y = h * 0.74, bh = Math.max(6, h * 0.022);
+    const limU = S.limitMs * u.f, X = v => x0 + (x1 - x0) * Math.min(Math.max(v / u.max, 0), 1);
+    ctx.fillStyle = T.line; ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y, x1 - x0, bh, bh / 2) : ctx.rect(x0, y, x1 - x0, bh); ctx.fill();
+    if (d.has && d.vU > 0.05) { ctx.fillStyle = zoneColor(d.vU, limU); ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x0, y, Math.max(bh, X(d.vU) - x0), bh, bh / 2) : ctx.rect(x0, y, X(d.vU) - x0, bh); ctx.fill(); }
+    if (limU < u.max) { ctx.fillStyle = T.alert; ctx.fillRect(X(limU) - 1.5, y - 7, 3, bh + 14); }
+    ctx.font = `500 ${Math.max(11, w * 0.03)}px ${MONO}`; ctx.fillStyle = T.muted; ctx.textBaseline = "top";
+    ctx.textAlign = "left"; ctx.fillText("0", x0, y + bh + 10);
+    ctx.textAlign = "right"; ctx.fillText(String(u.max), x1, y + bh + 10);
+    if (limU < u.max) { ctx.textAlign = "center"; ctx.fillStyle = T.alert; ctx.fillText(String(Math.round(limU)), X(limU), y + bh + 10); }
   }
 
-  // HUD: high-contrast night display; mirror it to read as a windshield reflection
-  function drawHud() {
-    const { ctx, w, h, U } = prep();
-    const over = state.shown > state.limitMs + 0.05, col = over ? "#ff5b52" : "#7dffb0";
-    const x0 = w * 0.12, x1 = w * 0.88, y = h * 0.74, bh = Math.max(6, h * 0.022);
-    ctx.fillStyle = col; ctx.globalAlpha = 0.22; ctx.fillRect(x0, y, x1 - x0, bh); ctx.globalAlpha = 1;
-    ctx.fillRect(x0, y, (x1 - x0) * Math.min(state.shown * U.f / U.max, 1), bh);
-    ctx.font = `600 ${Math.max(14, h * 0.05)}px ${DISPLAY_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(`LIMIT ${Math.round(state.limitMs * U.f)}`, w / 2, h * 0.87);
+  // ---- HUD: nothing but the number (DOM) and a thin limit progress line ----
+  function drawHud(d) {
+    const ctx = prep(G), { w, h } = G, u = U();
+    if (!d.has) return;
+    const limU = S.limitMs * u.f, frac = Math.min(d.vU / limU, 1.2) / 1.2;
+    const col = d.vU > limU * (1 + S.tol) ? "#ff5a50" : d.vU >= limU * 0.9 ? "#ffd27a" : "#9dffc6";
+    const x0 = w * 0.2, x1 = w * 0.8, y = h * 0.86;
+    ctx.fillStyle = col; ctx.globalAlpha = 0.25; ctx.fillRect(x0, y, x1 - x0, 3); ctx.globalAlpha = 1;
+    ctx.fillRect(x0, y, (x1 - x0) * frac, 3);
+    ctx.fillRect(x0 + (x1 - x0) / 1.2 - 1, y - 6, 2, 15);
+  }
+  const DRAW = { classic: drawClassic, sport: drawSport, digital: drawDigital, hud: drawHud };
+
+  // ---- Speed history chart: 5 min window, gaps where GPS had no usable speed ----
+  const hist = [];  // { t, v } v in m/s or null
+  function drawChart() {
+    const ctx = prep(C), { w, h } = C, u = U(); if (!w) return;
+    const now = Date.now(), span = 300000, padL = 34, padR = 8, padT = 8, padB = 22;
+    const vals = hist.filter(p => p.v !== null).map(p => p.v * u.f);
+    const limU = S.limitMs * u.f;
+    const step = u.major, top = Math.max(step, Math.ceil(Math.max(limU * 1.1, ...vals, 0) / step) * step);
+    const X = t => padL + (w - padL - padR) * (1 - (now - t) / span), Y = v => h - padB - (h - padT - padB) * v / top;
+    ctx.font = `400 11px ${MONO}`; ctx.fillStyle = T.muted; ctx.strokeStyle = T.line; ctx.lineWidth = 1;
+    ctx.textAlign = "right"; ctx.textBaseline = "middle";
+    const ticks = [0, top / 2, top];
+    for (const v of ticks) { const y = Math.round(Y(v)) + .5; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.fillText(String(Math.round(v)), padL - 6, y); }
+    ctx.textAlign = "center"; ctx.textBaseline = "top";
+    [["−5 min", now - span], ["−2.5", now - span / 2], ["now", now]].forEach(([l, t], i) => { ctx.textAlign = i === 0 ? "left" : i === 2 ? "right" : "center"; ctx.fillText(l, i === 0 ? padL : i === 2 ? w - padR : X(t), h - padB + 6); });
+    if (limU <= top) { ctx.setLineDash([4, 4]); ctx.strokeStyle = T.alert; const y = Math.round(Y(limU)) + .5; ctx.beginPath(); ctx.moveTo(padL, y); ctx.lineTo(w - padR, y); ctx.stroke(); ctx.setLineDash([]); }
+    // draw continuous runs; break the line where data is missing
+    ctx.strokeStyle = T.accent; ctx.lineWidth = 2; ctx.lineJoin = "round";
+    let run = [];
+    const flush = () => {
+      if (run.length > 1) {
+        ctx.beginPath(); run.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]));
+        ctx.stroke();
+        ctx.lineTo(run[run.length - 1][0], Y(0)); ctx.lineTo(run[0][0], Y(0)); ctx.closePath();
+        ctx.fillStyle = T["accent-soft"]; ctx.fill();
+      }
+      run = [];
+    };
+    for (const p of hist) { if (now - p.t > span) continue; if (p.v === null) { flush(); continue; } run.push([X(p.t), Y(p.v * u.f)]); }
+    flush();
   }
 
-  // ---------- Sparkline ----------
-  function drawSpark() {
-    const { ctx, w, h, dpr } = S; if (!w) return;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-    const N = 120, data = state.hist, pad = 6;
-    const top = Math.max(state.limitMs * 1.15, ...data, 5);
-    const x = i => pad + (w - 2 * pad) * (i + (N - data.length)) / (N - 1);
-    const y = v => h - pad - (h - 2 * pad) * v / top;
-    ctx.strokeStyle = T.line; ctx.lineWidth = 1;
-    ctx.beginPath(); ctx.moveTo(pad, h - pad + .5); ctx.lineTo(w - pad, h - pad + .5); ctx.stroke();
-    ctx.setLineDash([4, 4]); ctx.strokeStyle = T.alert;
-    ctx.beginPath(); ctx.moveTo(pad, Math.round(y(state.limitMs)) + .5); ctx.lineTo(w - pad, Math.round(y(state.limitMs)) + .5); ctx.stroke();
-    ctx.setLineDash([]);
-    if (data.length < 2) return;
-    ctx.beginPath(); data.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
-    ctx.lineTo(x(data.length - 1), h - pad); ctx.lineTo(x(0), h - pad); ctx.closePath();
-    ctx.fillStyle = T["accent-soft"]; ctx.fill();
-    ctx.beginPath(); data.forEach((v, i) => i ? ctx.lineTo(x(i), y(v)) : ctx.moveTo(x(i), y(v)));
-    ctx.strokeStyle = T.accent; ctx.lineWidth = 1.75; ctx.stroke();
-    const lv = data[data.length - 1];
-    ctx.beginPath(); ctx.arc(x(data.length - 1), y(lv), 3.5, 0, Math.PI * 2);
-    ctx.fillStyle = lv > state.limitMs ? T.alert : T.accent; ctx.fill();
+  // =====================================================================
+  // Display state and main loop
+  // =====================================================================
+  const disp = { x: 0, v: 0, has: false };    // spring-animated needle value (m/s)
+  let lastDrawSig = "", lastText = 0, lastHist = 0, lastSave = 0, lastAnnounce = { t: 0, v: null, s: "" };
+  const fmtTime = s => { s = Math.max(0, Math.floor(s)); const hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60; return (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
+  const fmtSpeed = ms => ms === null ? "––" : S.unit === "ms" ? (ms).toFixed(1) : String(Math.round(ms * U().f));
+
+  function statusInfo(now) {
+    if (gateKind) return { s: "blocked", text: "Location needed", q: 0 };
+    const st = engine.status(now), acc = engine.accuracy();
+    if (st === "idle" || st === "acquiring") return { s: "acquiring", text: "Finding GPS", q: 0 };
+    if (st === "lost") return { s: "lost", text: "Signal lost", q: 0 };
+    const a = acc === null ? "" : " ±" + Math.round(acc) + " m";
+    if (st === "poor") return { s: "poor", text: "Weak GPS" + a, q: 1 };
+    return { s: "ok", text: "GPS" + a, q: acc !== null && acc <= 10 ? 3 : 2 };
   }
 
-  // ---------- Audio ----------
-  let audioCtx = null, lastBeep = 0;
-  function beep() {
-    if (!audioCtx) return;
-    const o = audioCtx.createOscillator(), g = audioCtx.createGain(), t = audioCtx.currentTime;
-    o.frequency.value = 880; o.type = "sine";
-    g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.25, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.16);
-    o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.18);
-  }
+  let lastFrame = performance.now();
+  function frame(tPerf) {
+    const dt = Math.min((tPerf - lastFrame) / 1000, 0.1); lastFrame = tPerf;
+    const now = Date.now();
+    const speed = engine.speed(now);              // m/s or null
+    const has = speed !== null;
 
-  // ---------- Text updates ----------
-  const fmtTime = s => { s = Math.floor(s); const hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60; return (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
-  const speedText = () => state.unit === "ms" ? (state.shown * UNITS.ms.f).toFixed(1) : String(Math.round(state.shown * UNITS[state.unit].f));
-  function updateText() {
-    const U = UNITS[state.unit], t = state.trip, imp = state.unit === "mph";
-    $("#speedNum").textContent = speedText();
-    $("#mDist").textContent = (t.dist * U.df).toFixed(2) + " " + U.dist;
-    $("#mTime").textContent = fmtTime(t.elapsed);
-    $("#mTop").textContent = Math.round(t.max * U.f);
-    $("#tabDrive").textContent = document.body.dataset.view === "drive" ? "Drive" : speedText() + " " + U.label;
-    if (rec.on) {
-      const el = fmtTime((Date.now() - rec.start) / 1000);
-      $("#recPillT").textContent = "REC " + el;
-      $("#recInfo").textContent = "Recording · " + el + " · " + rec.points.length + " points";
+    // needle spring: critically damped, about 0.3 s settle; snaps when data appears or reduced motion is on
+    if (!has) { disp.has = false; }
+    else if (!disp.has || reduceMotion) { disp.x = speed; disp.v = 0; disp.has = true; }
+    else { const w = 7, a = w * w * (speed - disp.x) - 2 * w * disp.v; disp.v += a * dt; disp.x = Math.max(0, disp.x + disp.v * dt); if (Math.abs(speed - disp.x) < 0.01 && Math.abs(disp.v) < 0.01) { disp.x = speed; disp.v = 0; } }
+
+    // alerts run on the measured speed, not the animated needle
+    const al = overspeed.update(speed, S.limitMs, S.tol, now);
+    root.classList.toggle("over", al.over);
+    root.classList.toggle("near", al.near);
+    if (al.fire && S.alertOn) fireAlert();
+
+    // redraw the gauge only when something visible changed (saves battery when parked)
+    if (document.body.dataset.view === "drive") {
+      const u = U();
+      const d = { has: disp.has, vU: disp.x * u.f, maxU: engine.trip.max * u.f };
+      const sig = [S.style, S.unit, S.limitMs.toFixed(3), S.tol, d.has, d.vU.toFixed(2), Math.round(d.maxU), themeRev, G.rev].join("|");
+      if (sig !== lastDrawSig && G.w) { lastDrawSig = sig; DRAW[S.style](d); }
     }
-    if (document.body.dataset.view !== "trip") return;
-    $("#tDist").textContent = (t.dist * U.df).toFixed(2);
-    $("#tTime").textContent = fmtTime(t.elapsed);
-    $("#tAvg").textContent = t.moving > 1 ? Math.round(t.dist / t.moving * U.f) : 0;
-    $("#tMax").textContent = Math.round(t.max * U.f);
-    if (state.hdg != null && state.est > 0.8) { $("#iHdg").textContent = compass(state.hdg) + " " + Math.round(state.hdg) + "°"; $("#arw").style.transform = `rotate(${Math.round(state.hdg)}deg)`; }
-    else $("#iHdg").textContent = "—";
-    $("#iAlt").textContent = state.alt == null ? "—" : Math.round(imp ? state.alt * 3.28084 : state.alt) + (imp ? " ft" : " m");
-    $("#iG").textContent = (state.accel >= 0 ? "+" : "−") + Math.abs(state.accel / 9.81).toFixed(2) + " g";
-    const L = state.launch;
-    $("#iLaunchK").textContent = imp ? "0–60 mph" : "0–100 km/h";
-    $("#iLaunch").textContent = L.t0 !== null ? ((Date.now() - L.t0) / 1000).toFixed(1) + " s" : L.last ? L.last.toFixed(1) + " s" : L.armed ? "Ready" : "—";
-    $("#iLaunch").title = L.best ? "Best " + L.best.toFixed(1) + " s" : "";
-    $("#accText").textContent = state.acc != null ? "±" + Math.round(state.acc) + " m" : "±– m";
-    drawSpark();
-  }
-  function applyUnit() {
-    const U = UNITS[state.unit];
-    $("#speedUnit").textContent = U.label;
-    document.querySelectorAll(".uLbl").forEach(e => e.textContent = U.label);
-    $("#tDistU").textContent = U.dist;
-    document.querySelectorAll("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.u === state.unit));
-    $("#limitSign").textContent = Math.round(state.limitMs * U.f);
-  }
 
-  // ---------- Main loop ----------
-  let lastFrame = performance.now(), lastText = 0, lastSample = 0, lastAnnounce = 0;
-  function frame(now) {
-    const dt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
-    const target = state.est;
-    if (!gateKind && state.lastRecv && now - state.lastRecv > 5000) setStatus("bad", "Signal lost");
-    if (reduceMotion) { state.shown = target; state.vel = 0; }
-    else {
-      const w = 6, a = w * w * (target - state.shown) - 2 * w * state.vel;
-      state.vel += a * dt; state.shown = Math.max(0, state.shown + state.vel * dt);
-    }
-    const t = state.trip;
-    t.elapsed += dt;
-    if (state.est > 0.5) { t.dist += state.est * dt; t.moving += dt; }
-    t.max = Math.max(t.max, state.est);
-    if (now - lastSample > 500) { lastSample = now; state.hist.push(state.est); if (state.hist.length > 120) state.hist.shift(); }
-
-    const over = state.shown > state.limitMs + 0.05;
-    root.classList.toggle("over", over);
-    root.classList.toggle("warn", !over && state.shown >= state.limitMs * 0.9 && state.shown > 1);
-    if (over && state.sound && now - lastBeep > 1500) { lastBeep = now; beep(); try { navigator.vibrate?.([120, 80, 120]); } catch {} }
-
-    if (document.body.dataset.view === "drive") drawGauge();
-    if (now - lastText > 100) { lastText = now; updateText(); }
-    if (now - lastAnnounce > 5000 && document.body.dataset.view === "drive") { lastAnnounce = now; $("#live").textContent = speedText() + " " + UNITS[state.unit].label + (over ? ", over limit" : ""); }
+    if (tPerf - lastText > 200) { lastText = tPerf; updateText(now, speed); }
+    if (now - lastHist >= 1000) { lastHist = now; hist.push({ t: now, v: speed }); while (hist.length && now - hist[0].t > 305000) hist.shift(); if (document.body.dataset.view === "trip") drawChart(); }
+    if (now - lastSave > 10000) { lastSave = now; persist(); }
     requestAnimationFrame(frame);
   }
 
-  // ---------- Switch helper ----------
-  const setSwitch = (el, on) => el.setAttribute("aria-checked", on ? "true" : "false");
-
-  // ---------- Display style ----------
-  function applyStyle() {
-    const d = $("#dial");
-    d.dataset.style = state.style;
-    document.querySelectorAll("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === state.style));
-    d.classList.toggle("mirror", state.style === "hud" && state.mirror);
-    $("#mirrorSw").disabled = state.style !== "hud";
-    setSwitch($("#mirrorSw"), state.mirror);
-    document.body.classList.toggle("hudbg", state.style === "hud");
+  function updateText(now, speed) {
+    const u = U(), t = engine.trip, st = statusInfo(now);
+    // drive screen
+    const dial = $("#dial");
+    dial.classList.toggle("nodata", !disp.has);
+    $("#speedNum").textContent = disp.has ? fmtSpeed(disp.x) : "––";
+    $("#speedUnit").textContent = disp.has ? u.label : st.s === "lost" ? "Signal lost" : st.s === "blocked" ? "Location needed" : "Finding GPS";
+    const g = $("#gps"); g.dataset.s = st.s; g.dataset.q = st.q; $("#gpsText").textContent = st.text;
+    $("#lineDist").textContent = (t.dist * u.df).toFixed(t.dist * u.df < 100 ? 1 : 0) + " " + u.dist;
+    $("#lineTime").textContent = fmtTime(t.elapsed) + " · avg " + (t.moving > 5 ? Math.round(t.dist / t.moving * u.f) : 0);
+    $("#tabDrive").textContent = document.body.dataset.view === "drive" ? "Drive" : (speed === null ? "––" : fmtSpeed(speed)) + " " + u.label;
+    if (rec.on) $("#recPillT").textContent = (rec.paused ? "PAUSED " : "REC ") + fmtTime(recActive() / 1000);
+    announce(now, speed, st);
+    if (document.body.dataset.view === "trip") updateTrip(now, speed);
   }
-  function setStyle(st) { state.style = st; store.set("style", st); applyStyle(); }
-  document.querySelectorAll("#styleSeg button").forEach(b => b.onclick = () => setStyle(b.dataset.st));
-  $("#mirrorSw").onclick = () => { state.mirror = !state.mirror; store.set("mirror", state.mirror); applyStyle(); };
 
-  // ---------- Controls ----------
-  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => {
-    state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips();
-  });
-  function setLimit(vU) {
-    const U = UNITS[state.unit];
-    vU = Math.min(Math.max(Number(vU) || 0, 5), U.max);
-    state.limitMs = vU / U.f; store.set("limitMs", state.limitMs); applyUnit();
+  // screen reader: announce state changes, and speed only when it changes meaningfully (≥10 s apart)
+  function announce(now, speed, st) {
+    if (document.body.dataset.view !== "drive") return;
+    let msg = null;
+    if (st.s !== lastAnnounce.s) msg = st.s === "lost" ? "GPS signal lost" : st.s === "ok" && lastAnnounce.s !== "poor" ? "GPS ready" : st.s === "poor" ? "Weak GPS signal" : null;
+    const over = root.classList.contains("over");
+    if (over && !lastAnnounce.over) msg = "Over the speed limit";
+    if (!msg && speed !== null && now - lastAnnounce.t > 10000 && (lastAnnounce.v === null || Math.abs(speed - lastAnnounce.v) * U().f >= 5)) msg = fmtSpeed(speed) + " " + U().label;
+    lastAnnounce.s = st.s; lastAnnounce.over = over;
+    if (msg) { $("#live").textContent = msg; lastAnnounce.t = now; if (speed !== null) lastAnnounce.v = speed; }
   }
-  const limStep = () => state.unit === "ms" ? 1 : 5;
-  const limNow = () => Math.round(state.limitMs * UNITS[state.unit].f);
-  $("#limUp").onclick = () => setLimit(Math.floor(limNow() / limStep()) * limStep() + limStep());
-  $("#limDown").onclick = () => setLimit(Math.ceil(limNow() / limStep()) * limStep() - limStep());
-  $("#resetTrip").onclick = () => { state.trip = { dist: 0, moving: 0, elapsed: 0, max: 0 }; state.hist = []; state.launch.last = state.launch.best = null; };
-  $("#soundBtn").onclick = () => {
-    state.sound = !state.sound;
-    if (state.sound) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); beep(); } catch { state.sound = false; } }
-    $("#soundBtn").setAttribute("aria-pressed", state.sound);
-    $("#soundBtnT").textContent = state.sound ? "Speed alert on" : "Speed alert off";
+
+  // =====================================================================
+  // Trip screen
+  // =====================================================================
+  function updateTrip(now, speed) {
+    const u = U(), t = engine.trip;
+    $("#tDist").textContent = (t.dist * u.df).toFixed(2);
+    $("#tElapsed").textContent = fmtTime(t.elapsed);
+    $("#tMoving").textContent = fmtTime(t.moving);
+    $("#tAvg").textContent = t.moving > 5 ? Math.round(t.dist / t.moving * u.f) : 0;
+    $("#tNow").textContent = fmtSpeed(speed);
+    $("#tMax").textContent = Math.round(t.max * u.f);
+    // distribution
+    const bands = new Array(u.bands).fill(0);
+    t.bins.forEach((secs, i) => { if (!secs) return; const vU = (i + 0.5) * u.f; bands[Math.min(u.bands - 1, Math.floor(vU / u.band))] += secs; });
+    const total = bands.reduce((a, b) => a + b, 0), limU = S.limitMs * u.f;
+    const dist = $("#dist");
+    if (total < 5) dist.innerHTML = '<span class="muted" style="font-size:14px">Speed breakdown appears once you start moving.</span>';
+    else dist.innerHTML = bands.map((s, i) => {
+      const lo = i * u.band, hi = (i + 1) * u.band, pct = s / total * 100;
+      const label = i === u.bands - 1 ? `${lo}+` : `${lo}–${hi}`;
+      return `<div class="row${lo >= limU ? " over" : ""}"><span class="lab">${label}</span><span class="bar"><i style="width:${pct.toFixed(1)}%"></i></span><span class="pct">${pct < 1 && pct > 0 ? "<1" : Math.round(pct)}%</span></div>`;
+    }).join("");
+    // more measurements
+    const imp = S.unit === "mph";
+    if (engine.heading !== null && speed !== null && speed > 1) { $("#iHdg").textContent = ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(engine.heading / 45) % 8] + " " + Math.round(engine.heading) + "°"; $("#arw").style.transform = `rotate(${Math.round(engine.heading)}deg)`; }
+    else $("#iHdg").textContent = "––";
+    $("#iAlt").textContent = engine.altitude === null ? "––" : Math.round(imp ? engine.altitude * 3.28084 : engine.altitude) + (imp ? " ft" : " m");
+    $("#iG").textContent = speed === null ? "––" : (engine.accel >= 0 ? "+" : "−") + Math.abs(engine.accel / 9.81).toFixed(2) + " g";
+    const L = engine.launch, running = L.running(now);
+    $("#iLaunchK").textContent = imp ? "0–60 mph" : "0–100 km/h";
+    if (running !== null) { $("#iLaunch").textContent = running.toFixed(1) + " s"; $("#iLaunchH").textContent = "Timing…"; }
+    else if (L.last) { $("#iLaunch").innerHTML = L.last.secs.toFixed(1) + ` s <span class="tag ${L.last.reliable ? "ok" : "warn"}">${L.last.reliable ? "±0.5 s" : "rough"}</span>`; $("#iLaunchH").textContent = L.best ? "Best " + L.best.secs.toFixed(1) + " s · stop to time again" : "GPS gap during run · stop to time again"; }
+    else { $("#iLaunch").textContent = L.armed() ? "Ready" : "––"; $("#iLaunchH").textContent = L.armed() ? "Accelerate when safe" : "Stop, then accelerate"; }
+  }
+  $("#resetTrip").onclick = e => {
+    const b = e.currentTarget;
+    if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Tap to confirm"; setTimeout(() => { delete b.dataset.confirm; b.textContent = "Reset trip"; }, 3000); return; }
+    delete b.dataset.confirm; b.textContent = "Reset trip";
+    engine.resetTrip(); hist.length = 0; persist(); lastDrawSig = ""; toast("Trip reset");
   };
 
-  // ---------- Wake lock ----------
-  let wakeLock = null;
-  async function requestWake() {
-    try {
-      wakeLock = await navigator.wakeLock.request("screen");
-      wakeLock.addEventListener?.("release", () => { if (document.visibilityState === "visible") { wakeLock = null; setSwitch($("#wakeSw"), false); } });
-      setSwitch($("#wakeSw"), true); return true;
-    } catch { $("#wakeSub").textContent = "This browser can't keep the screen on. Raise the auto-lock time in your phone settings instead."; setSwitch($("#wakeSw"), false); return false; }
+  // =====================================================================
+  // Recording: start / pause / resume / stop, survives refresh
+  // =====================================================================
+  const rec = { on: false, paused: false, start: 0, activeMs: 0, resumedAt: 0, points: [], dist: 0, max: 0, lastDist: 0 };
+  const recActive = () => rec.activeMs + (rec.on && !rec.paused ? Date.now() - rec.resumedAt : 0);
+  function recordPoint(p, res) {
+    const dNow = engine.trip.dist;
+    if (rec.on && !rec.paused) {
+      rec.dist += Math.max(0, dNow - rec.lastDist);
+      const sh = engine.moving ? engine.kf.x : 0;
+      if (engine.status(Date.now()) === "ok") rec.max = Math.max(rec.max, sh);
+      const c = p.coords;
+      rec.points.push([p.timestamp, +c.latitude.toFixed(6), +c.longitude.toFixed(6), Number.isFinite(c.altitude) ? Math.round(c.altitude * 10) / 10 : null, Math.round(sh * 100) / 100]);
+    }
+    rec.lastDist = dNow;
   }
-  async function releaseWake() { try { await wakeLock?.release(); } catch {} wakeLock = null; setSwitch($("#wakeSw"), false); }
-  $("#wakeSw").onclick = () => wakeLock ? releaseWake() : requestWake();
-  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && $("#wakeSw").getAttribute("aria-checked") === "true" && !wakeLock) requestWake(); });
+  function recUI() {
+    const st = !rec.on ? "off" : rec.paused ? "paused" : "on";
+    $("#recBtnD").dataset.state = st;
+    $("#recBtnDT").textContent = st === "off" ? "Record" : st === "paused" ? "Resume" : "Pause";
+    $("#recStart").hidden = rec.on;
+    $("#recPause").hidden = !rec.on; $("#recPause").textContent = rec.paused ? "Resume" : "Pause";
+    $("#recStop").hidden = !rec.on;
+    $("#recTag").textContent = st === "off" ? "Off" : st === "paused" ? "Paused" : "Recording";
+    $("#recTag").className = "tag" + (st === "on" ? " warn" : "");
+    $("#recPill").hidden = !rec.on; $("#recPill").classList.toggle("paused", rec.paused);
+    if (rec.on) $("#recInfo").textContent = rec.paused ? "Paused. Distance and route aren't recorded until you resume." : "Recording your route. It's saved on this phone as you go, even if the page reloads.";
+  }
+  function recStart() {
+    Object.assign(rec, { on: true, paused: false, start: Date.now(), activeMs: 0, resumedAt: Date.now(), points: [], dist: 0, max: 0, lastDist: engine.trip.dist });
+    recUI(); persist(); toast("Recording started");
+  }
+  function recTogglePause() {
+    if (!rec.on) return;
+    if (rec.paused) { rec.paused = false; rec.resumedAt = Date.now(); rec.lastDist = engine.trip.dist; }
+    else { rec.activeMs += Date.now() - rec.resumedAt; rec.paused = true; }
+    recUI(); persist();
+  }
+  function recStop() {
+    if (!rec.on) return;
+    if (!rec.paused) rec.activeMs += Date.now() - rec.resumedAt;
+    rec.on = false; rec.paused = false;
+    store.del("rec");
+    if (rec.points.length < 2) { recUI(); $("#recInfo").textContent = "Nothing was saved: no GPS points were recorded. Record while moving with a GPS signal."; return; }
+    let pts = rec.points; const step = Math.ceil(pts.length / 3000); if (step > 1) pts = pts.filter((_, i) => i % step === 0 || i === pts.length - 1);
+    const trip = { id: rec.start, start: rec.start, dur: rec.activeMs / 1000, dist: rec.dist, max: rec.max, pts };
+    const trips = loadTrips(); trips.push(trip); while (trips.length > 20) trips.shift();
+    const ok = store.set("trips", trips);
+    recUI();
+    $("#recInfo").textContent = ok ? "Trip saved. Export it below." : "Couldn't save: this phone's browser storage is full. Delete an old trip and try again.";
+    toast(ok ? "Trip saved" : "Couldn't save trip");
+    renderTrips();
+  }
+  $("#recStart").onclick = recStart;
+  $("#recPause").onclick = recTogglePause;
+  $("#recStop").onclick = recStop;
+  $("#recBtnD").onclick = () => rec.on ? recTogglePause() : recStart();
+  $("#recPill").onclick = () => { location.hash = "#trip"; };
 
-  // ---------- Drive mode ----------
-  function setDrive(on) {
-    document.body.classList.toggle("drive", on);
-    $("#fsBtn").setAttribute("aria-pressed", on);
-    $("#fsIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
-    if (on) {
-      const p = document.documentElement.requestFullscreen?.(); if (p) p.catch(() => {});
-      if (!wakeLock) requestWake();
-    } else if (document.fullscreenElement) {
-      const p = document.exitFullscreen?.(); if (p) p.catch(() => {});
+  // ---- persistence of the running trip and any in-progress recording ----
+  function persist() {
+    store.set("trip", engine.exportTrip());
+    if (rec.on) {
+      const snap = Object.assign({}, rec, { activeMs: recActive(), resumedAt: 0 });
+      store.set("rec", snap);
     }
   }
-  $("#fsBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
-  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("drive")) setDrive(false); });
+  function restoreRec() {
+    const r = store.get("rec", null);
+    if (!r || !r.on || !Array.isArray(r.points)) return;
+    Object.assign(rec, r, { resumedAt: Date.now(), lastDist: engine.trip.dist });
+    recUI();
+    toast(rec.paused ? "Paused recording restored" : "Recording resumed after reload");
+  }
+  addEventListener("pagehide", persist);
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") persist();
+    else {
+      if (gateKind === "denied" || gateKind === "off") startGps();
+      if (wakeWanted && !wakeLock) requestWake();
+    }
+  });
 
-  // ---------- Trip log ----------
+  // ---- saved trips ----
   const loadTrips = () => { const a = store.get("trips", []); return Array.isArray(a) ? a : []; };
   function renderTrips() {
-    const U = UNITS[state.unit], list = $("#trips"), trips = loadTrips();
-    if (!trips.length) { list.innerHTML = '<li><span>No trips saved yet. Tap Start recording before you set off.</span></li>'; return; }
+    const u = U(), list = $("#trips"), trips = loadTrips();
+    $("#tripCount").textContent = trips.length ? `${trips.length} trip${trips.length > 1 ? "s" : ""} saved on this phone.` : "No trips saved.";
+    $("#clearTrips").disabled = !trips.length;
+    if (!trips.length) { list.innerHTML = ""; return; }
     list.innerHTML = trips.slice().reverse().map(tr => {
       const d = new Date(tr.start);
-      const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
-      return `<li><div><strong>${when}${tr.mode === "sim" ? " · simulated" : ""}</strong><span>${(tr.dist * U.df).toFixed(2)} ${U.dist} · ${fmtTime(tr.dur)} · top ${Math.round(tr.max * U.f)} ${U.label}</span></div>
+      const when = d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+      return `<li><div><strong>${when}</strong><span>${(tr.dist * u.df).toFixed(2)} ${u.dist} · ${fmtTime(tr.dur)} · top ${Math.round(tr.max * u.f)} ${u.label}</span></div>
         <div class="acts"><button class="btn sm" data-x="gpx" data-id="${tr.id}">GPX</button><button class="btn sm" data-x="csv" data-id="${tr.id}">CSV</button><button class="btn sm" data-x="del" data-id="${tr.id}" aria-label="Delete trip">Delete</button></div></li>`;
     }).join("");
   }
+  const iso = t => new Date(t).toISOString();
+  const esc = s => String(s).replace(/[<>&"]/g, c => ({ "<": "&lt;", ">": "&gt;", "&": "&amp;", '"': "&quot;" }[c]));
+  function toGPX(tr) {
+    const pts = tr.pts.map(p => `      <trkpt lat="${p[1]}" lon="${p[2]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ""}<time>${iso(p[0])}</time><extensions><speed>${p[4]}</speed></extensions></trkpt>`).join("\n");
+    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Pacer Speedometer" xmlns="http://www.topografix.com/GPX/1/1">\n  <metadata><name>${esc("Pacer trip " + iso(tr.start))}</name><time>${iso(tr.start)}</time></metadata>\n  <trk><name>${esc("Pacer trip " + iso(tr.start))}</name><trkseg>\n${pts}\n  </trkseg></trk>\n</gpx>\n`;
+  }
+  const toCSV = tr => "time_utc,latitude,longitude,altitude_m,speed_kmh\n" + tr.pts.map(p => [iso(p[0]), p[1], p[2], p[3] ?? "", (p[4] * 3.6).toFixed(1)].join(",")).join("\n") + "\n";
   function download(name, text, type) {
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name;
     document.body.appendChild(a); a.click();
-    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 1500);
+    setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 2000);
   }
-  const iso = t => new Date(t).toISOString();
-  function toGPX(tr) {
-    const pts = tr.pts.map(p => `      <trkpt lat="${p[1]}" lon="${p[2]}">${p[3] != null ? `<ele>${p[3]}</ele>` : ""}<time>${iso(p[0])}</time></trkpt>`).join("\n");
-    return `<?xml version="1.0" encoding="UTF-8"?>\n<gpx version="1.1" creator="Pacer Speedometer" xmlns="http://www.topografix.com/GPX/1/1">\n  <trk><name>Pacer trip ${iso(tr.start)}</name><trkseg>\n${pts}\n  </trkseg></trk>\n</gpx>\n`;
-  }
-  const toCSV = tr => "time_utc,latitude,longitude,altitude_m,speed_kmh\n" + tr.pts.map(p => [iso(p[0]), p[1], p[2], p[3] ?? "", (p[4] * 3.6).toFixed(1)].join(",")).join("\n") + "\n";
   $("#trips").addEventListener("click", e => {
     const b = e.target.closest("button[data-x]"); if (!b) return;
     const trips = loadTrips(), tr = trips.find(t => String(t.id) === b.dataset.id); if (!tr) return;
     const stamp = iso(tr.start).slice(0, 16).replace(/[:T]/g, "-");
     if (b.dataset.x === "gpx") download(`pacer-${stamp}.gpx`, toGPX(tr), "application/gpx+xml");
     else if (b.dataset.x === "csv") download(`pacer-${stamp}.csv`, toCSV(tr), "text/csv");
-    else if (b.dataset.x === "del") {
-      if (b.dataset.confirm) { store.set("trips", trips.filter(t => t !== tr)); renderTrips(); }
-      else { b.dataset.confirm = "1"; b.textContent = "Tap to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Delete"; } }, 3000); }
-    }
+    else if (b.dataset.confirm) { store.set("trips", trips.filter(t => t !== tr)); renderTrips(); toast("Trip deleted"); }
+    else { b.dataset.confirm = "1"; b.textContent = "Confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Delete"; } }, 3000); }
   });
-  function recUI() {
-    const btn = $("#recBtn");
-    btn.textContent = rec.on ? "Stop & save" : "Start recording";
-    btn.classList.toggle("rec", rec.on); btn.classList.toggle("primary", !rec.on); btn.setAttribute("aria-pressed", rec.on);
-    $("#recBtnD").setAttribute("aria-pressed", rec.on);
-    $("#recBtnDT").textContent = rec.on ? "Stop & save" : "Record trip";
-    $("#recPill").hidden = !rec.on;
-  }
-  function toggleRec() {
-    if (!rec.on) {
-      rec.on = true; rec.points = []; rec.start = Date.now(); rec.trip0 = { ...state.trip };
-      recUI(); return;
-    }
-    rec.on = false; recUI();
-    if (rec.points.length < 2) { $("#recInfo").textContent = "Nothing to save yet. Record for a few seconds while moving."; return; }
-    let pts = rec.points; const step = Math.ceil(pts.length / 1500); if (step > 1) pts = pts.filter((_, i) => i % step === 0);
-    const tr = { id: rec.start, start: rec.start, dur: (Date.now() - rec.start) / 1000, dist: state.trip.dist - rec.trip0.dist,
-      max: Math.max(...rec.points.map(p => p[4])), mode: "gps", pts };
-    const trips = loadTrips(); trips.push(tr); while (trips.length > 15) trips.shift();
-    store.set("trips", trips);
-    const saved = loadTrips().some(t => t.id === tr.id);
-    $("#recInfo").textContent = saved ? "Trip saved. Export it as GPX or CSV below." : "Couldn't save: this browser's storage is full or blocked. Delete an old trip and try again.";
-    $("#recBtnDT").textContent = saved ? "Saved · Record again" : "Save failed · see Trip";
-    renderTrips();
-  }
-  $("#recBtn").onclick = toggleRec;
-  $("#recBtnD").onclick = toggleRec;
-  $("#recPill").addEventListener("click", () => { location.hash = "#trip"; });
+  $("#clearTrips").onclick = e => {
+    const b = e.currentTarget;
+    if (!b.dataset.confirm) { b.dataset.confirm = "1"; b.textContent = "Tap to confirm"; setTimeout(() => { delete b.dataset.confirm; b.textContent = "Delete all"; }, 3000); return; }
+    delete b.dataset.confirm; b.textContent = "Delete all"; store.del("trips"); renderTrips(); toast("All trips deleted");
+  };
 
-  // ---------- Theme ----------
-  function applyTheme(th) {
-    if (th === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", th);
-    document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.th === th));
+  // =====================================================================
+  // Alerts: visual always; sound + vibration when the alert is on
+  // =====================================================================
+  let audioCtx = null;
+  function unlockAudio() { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); if (audioCtx.state === "suspended") audioCtx.resume(); } catch {} }
+  function chime() {
+    if (!audioCtx || audioCtx.state !== "running") return;
+    const t = audioCtx.currentTime;
+    [0, 0.18].forEach((off, i) => {
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = "sine"; o.frequency.value = i ? 1046 : 880;
+      g.gain.setValueAtTime(0.0001, t + off); g.gain.exponentialRampToValueAtTime(0.3, t + off + 0.015); g.gain.exponentialRampToValueAtTime(0.0001, t + off + 0.16);
+      o.connect(g).connect(audioCtx.destination); o.start(t + off); o.stop(t + off + 0.18);
+    });
   }
-  document.querySelectorAll("#themeSeg button").forEach(b => b.onclick = () => { store.set("theme", b.dataset.th); applyTheme(b.dataset.th); });
-  applyTheme(pick("theme", "auto", v => ["auto", "light", "dark"].includes(v)));
+  function fireAlert() { chime(); try { navigator.vibrate?.([150, 90, 150]); } catch {} }
+  function applyAlertUI() {
+    const b = $("#alertBtn");
+    b.setAttribute("aria-pressed", S.alertOn);
+    $("#alertBtnT").textContent = S.alertOn ? "Alert on" : "Alert off";
+    $("#alertIcon").setAttribute("href", S.alertOn ? "#i-bell" : "#i-belloff");
+  }
+  $("#alertBtn").onclick = () => {
+    S.alertOn = !S.alertOn; store.set("alertOn", S.alertOn);
+    if (S.alertOn) { unlockAudio(); setTimeout(chime, 50); toast("You'll hear a chime above " + Math.round(S.limitMs * (1 + S.tol) * U().f) + " " + U().label); }
+    applyAlertUI();
+  };
+  // Browsers block sound until the user interacts; unlock on the first tap anywhere if the alert was left on.
+  addEventListener("pointerdown", () => { if (S.alertOn) unlockAudio(); }, { once: true, capture: true });
 
-  // ---------- Router ----------
+  // =====================================================================
+  // Quick controls: units, style, limit, mirror
+  // =====================================================================
+  function applyUnit() {
+    const u = U();
+    $$("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.u === S.unit));
+    $$(".uLbl").forEach(e => e.textContent = u.label);
+    $("#tDistU").textContent = u.dist; $("#chartUnit").textContent = u.label;
+    $("#limitSign").textContent = Math.round(S.limitMs * u.f);
+    $("#limitSign").setAttribute("aria-label", "Speed limit " + Math.round(S.limitMs * u.f) + " " + u.label);
+    setLaunchTarget(); renderTrips(); lastDrawSig = "";
+  }
+  $$("#unitSeg button").forEach(b => b.onclick = () => { S.unit = b.dataset.u; store.set("unit", S.unit); applyUnit(); });
+  function setLimitU(vU) {
+    const u = U(); vU = Math.min(Math.max(Math.round(vU), u.step), u.max);
+    S.limitMs = vU / u.f; store.set("limitMs", S.limitMs); applyUnit();
+  }
+  const limNow = () => Math.round(S.limitMs * U().f);
+  $("#limUp").onclick = () => setLimitU(Math.floor(limNow() / U().step) * U().step + U().step);
+  $("#limDown").onclick = () => setLimitU(Math.ceil(limNow() / U().step) * U().step - U().step);
+
+  function applyStyle() {
+    const d = $("#dial");
+    d.dataset.style = S.style;
+    $$("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === S.style));
+    $("#mirrorWrap").hidden = S.style !== "hud";
+    $("#mirrorBtn").setAttribute("aria-pressed", S.mirror);
+    d.classList.toggle("mirror", S.style === "hud" && S.mirror);
+    document.body.classList.toggle("hudbg", S.style === "hud");
+    lastDrawSig = "";
+  }
+  $$("#styleSeg button").forEach(b => b.onclick = () => { S.style = b.dataset.st; store.set("style", S.style); applyStyle(); });
+  $("#mirrorBtn").onclick = () => { S.mirror = !S.mirror; store.set("mirror", S.mirror); applyStyle(); };
+
+  $$("#tolSeg button").forEach(b => b.onclick = () => { S.tol = Number(b.dataset.tol); store.set("tol", S.tol); applyTol(); });
+  function applyTol() { $$("#tolSeg button").forEach(b => b.setAttribute("aria-pressed", Number(b.dataset.tol) === S.tol)); lastDrawSig = ""; }
+
+  function applyTheme() {
+    if (S.theme === "auto") document.documentElement.removeAttribute("data-theme"); else document.documentElement.setAttribute("data-theme", S.theme);
+    $$("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.th === S.theme));
+  }
+  $$("#themeSeg button").forEach(b => b.onclick = () => { S.theme = b.dataset.th; store.set("theme", S.theme); applyTheme(); });
+
+  // =====================================================================
+  // Wake lock and drive mode
+  // =====================================================================
+  let wakeLock = null, wakeWanted = false;
+  async function requestWake() {
+    if (!("wakeLock" in navigator)) { wakeUnsupported(); return false; }
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener?.("release", () => { wakeLock = null; });
+      $("#wakeSw").setAttribute("aria-checked", "true"); return true;
+    } catch { if (document.visibilityState === "visible") wakeUnsupported(); return false; }
+  }
+  function wakeUnsupported() { wakeWanted = false; $("#wakeSw").setAttribute("aria-checked", "false"); $("#wakeSub").textContent = "This browser can't keep the screen on. Set a longer auto-lock time in your phone's display settings instead."; }
+  async function releaseWake() { wakeWanted = false; try { await wakeLock?.release(); } catch {} wakeLock = null; $("#wakeSw").setAttribute("aria-checked", "false"); }
+  $("#wakeSw").onclick = () => { if (wakeWanted) releaseWake(); else { wakeWanted = true; requestWake(); } };
+
+  function setDrive(on) {
+    document.body.classList.toggle("drive", on);
+    $("#fsBtn").setAttribute("aria-pressed", on);
+    $("#fsIcon").setAttribute("href", on ? "#i-shrink" : "#i-expand");
+    $("#fsBtn").setAttribute("aria-label", on ? "Exit drive mode" : "Drive mode: gauge only, full screen, screen stays on");
+    if (on) {
+      const p = document.documentElement.requestFullscreen?.(); if (p) p.catch(() => {});
+      if (!wakeLock) { wakeWanted = true; requestWake(); }
+    } else if (document.fullscreenElement) { const p = document.exitFullscreen?.(); if (p) p.catch(() => {}); }
+    lastDrawSig = "";
+  }
+  $("#fsBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("drive")) setDrive(false); });
+
+  // =====================================================================
+  // Toast
+  // =====================================================================
+  let toastTimer = null;
+  function toast(msg) { const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 2600); }
+
+  // =====================================================================
+  // Router
+  // =====================================================================
   const VIEWS = ["drive", "trip", "settings", "about"];
   const TITLES = { drive: "Pacer Speedometer", trip: "Trip · Pacer", settings: "Settings · Pacer", about: "About · Pacer" };
   function route() {
     let v = (location.hash || "#drive").slice(1);
     if (!VIEWS.includes(v)) v = "drive";
     if (v !== "drive" && document.body.classList.contains("drive")) setDrive(false);
-    document.querySelectorAll(".view").forEach(s => s.hidden = s.dataset.view !== v);
-    document.querySelectorAll(".tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.to === v ? "page" : "false"));
+    $$(".view").forEach(s => s.hidden = s.dataset.view !== v);
+    $$(".tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.to === v ? "page" : "false"));
     document.body.dataset.view = v;
     document.title = TITLES[v];
     window.scrollTo(0, 0);
-    updateText();
+    lastDrawSig = "";
+    updateText(Date.now(), engine.speed(Date.now()));
+    if (v === "trip") drawChart();
   }
   addEventListener("hashchange", route);
-  document.querySelectorAll("[data-scroll]").forEach(b => b.onclick = () => document.getElementById(b.dataset.scroll)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }));
 
-  applyUnit();
-  applyStyle();
-  renderTrips();
+  // =====================================================================
+  // Boot
+  // =====================================================================
+  applyTheme(); applyUnit(); applyStyle(); applyTol(); applyAlertUI(); recUI(); renderTrips();
+  restoreRec();
   route();
   bootLocation();
   requestAnimationFrame(frame);

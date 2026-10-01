@@ -1,27 +1,26 @@
 # Pacer Speedometer
 
-A GPS speedometer that runs in the browser: Kalman-filtered speed, a 60 fps dial, trip computer, 60-second speed graph and an overspeed alert.
+A GPS speedometer that runs in your phone's browser. No app store, no account, no backend: your location never leaves the phone.
 
 **Live:** https://vishai12345.github.io/speedometer/
 
-## Screens
-- **Drive** (`#drive`): the speedometer only, with the limit sign, recording indicator and a drive-mode button. Tap the dial to switch style.
-- **Trip** (`#trip`): trip computer, heading, altitude, G meter, 0–100 timer, 60-second graph, recording and trip log with GPX/CSV export.
-- **Settings** (`#settings`): speed source, units, style, HUD mirror, theme, speed limit, alerts, keep screen on.
-- **About** (`#about`): how it works.
-
-All screens live in one page, so GPS and recording keep running while you switch tabs.
-
 ## Use
-1. Open the live link on your phone in Safari or Chrome.
-2. Allow location when your browser asks.
-3. Go outdoors with a clear view of the sky.
+1. Open the link in Safari or Chrome on your phone and allow location.
+2. The Drive screen shows your speed. Set the limit with − / +, pick units and a style, tap **Record** to save a trip and **Alert** for a chime above the limit.
+3. Tap the expand icon for drive mode: gauge only, full screen, screen kept on.
 
-**Display styles:** Classic needle dial, Sport LED arc, large Digital readout, and HUD (mirrorable for windshield reflection at night). **Drive mode** shows only the dial, full screen, with the screen kept on.
+## Screens
+- **Drive:** speed first; GPS status, speed limit, trip line and quick controls.
+- **Trip:** distance, times, speed breakdown, 5-minute chart, recording (start / pause / stop) and saved trips with GPX and CSV export.
+- **Settings:** alert tolerance, theme, keep screen on, saved data.
+- **About:** how speed and distance are measured, and validation results.
 
-**Also included:** compass heading, altitude, G meter, automatic 0–100 km/h (0–60 mph) timer, trip recording with GPX/CSV export, chime + vibration speed alerts, green/amber/red speed zones, a top-speed marker on the dial, knots, and Auto/Day/Night themes.
-
-GPS starts as soon as the page opens. Until location is allowed, the speedometer stays locked and shows steps for turning location on for your device.
+## Files
+- `index.html` — the app (UI, rendering, recording, permissions).
+- `engine.js` — measurement engine with no DOM: fix validation, Kalman speed filter, signal states, distance, 0–100 timing, overspeed alerting.
+- `tests/engine.test.js` — engine tests on synthetic GPS traces with known ground truth: `node tests/engine.test.js`
+- `tests/ui_scenarios.py` — browser scenario tests with a fake GPS (Playwright): `python3 -m http.server 8765 & python3 tests/ui_scenarios.py`
+- `docs/REVIEW-RESPONSE.md` — audit, engineering decisions, test results and open items.
 
 ## Deploy
-The whole app is one file, `index.html`, with no build step. GitHub Pages serves it from `main` / root over HTTPS, which browsers require for location access.
+Static files only. GitHub Pages serves `main` / root over HTTPS, which browsers require for location.
