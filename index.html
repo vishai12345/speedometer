@@ -68,6 +68,23 @@ button,input{font:inherit;color:inherit}
 .over .readout .v{color:var(--alert)}
 .flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
 .over .flag{visibility:visible;animation:pulse .9s infinite}
+/* display styles */
+.dial[data-style="sport"] .readout{top:38%}
+.dial[data-style="digital"] .readout{top:10%}
+.dial[data-style="digital"] .readout .v{font-size:clamp(96px,30vw,168px)}
+.dial[data-style="hud"]{background:#000;border-radius:14px}
+.dial[data-style="hud"] .readout{top:14%}
+.dial[data-style="hud"] .readout .v{font-size:clamp(110px,34vw,190px);color:#7dffb0;text-shadow:0 0 18px rgba(125,255,176,.45)}
+.dial[data-style="hud"] .readout .u{color:#7dffb0;opacity:.8}
+.over .dial[data-style="hud"] .readout .v{color:#ff5b52;text-shadow:0 0 18px rgba(255,91,82,.5)}
+.dial.mirror{transform:scaleX(-1)}
+/* drive mode: dial only, fills the screen */
+body.drive .top, body.drive .side, body.drive .docs{display:none}
+body.drive .cluster{grid-template-columns:minmax(0,1fr)}
+body.drive .wrap{padding-block:8px}
+body.drive .dialbox{min-height:calc(100dvh - 24px);justify-content:center;border:0;background:var(--bg)}
+body.drive .dial{max-width:min(94vw,70dvh);max-height:none}
+body.drive.hudbg, body.drive.hudbg .dialbox{background:#000}
 
 .seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
 .seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
@@ -124,7 +141,7 @@ ul{padding-left:20px}
 <div class="wrap" id="app">
   <header class="top">
     <div>
-      <div class="eyebrow">Web instrument · v1.0</div>
+      <div class="eyebrow">Web instrument · v1.1</div>
       <h1>Pacer Speedometer</h1>
       <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and an overspeed alert. Opens on a simulated drive so you can see it working right away.</p>
     </div>
@@ -152,6 +169,16 @@ ul{padding-left:20px}
           <button data-u="mph" aria-pressed="false">mph</button>
           <button data-u="ms" aria-pressed="false">m/s</button>
         </div>
+      </div>
+      <div class="row" style="justify-content:center">
+        <div class="seg" role="group" aria-label="Display style" id="styleSeg">
+          <button data-st="classic" aria-pressed="true">Classic</button>
+          <button data-st="sport" aria-pressed="false">Sport</button>
+          <button data-st="digital" aria-pressed="false">Digital</button>
+          <button data-st="hud" aria-pressed="false">HUD</button>
+        </div>
+        <button class="btn" id="mirrorBtn" aria-pressed="false" hidden>Mirror for windshield</button>
+        <button class="btn" id="driveBtn" aria-pressed="false">Drive mode</button>
       </div>
     </div>
 
@@ -216,6 +243,8 @@ ul{padding-left:20px}
       <tr><td>Haversine fallback</td><td>Derives speed from distance ÷ time when the device reports no Doppler speed</td><td>—</td></tr>
       <tr><td>Trip computer</td><td>Integrates distance, moving time, average and top speed</td><td>—</td></tr>
       <tr><td>Alert engine</td><td>Compares speed to the limit; drives the red state and the chime</td><td>Web Audio</td></tr>
+      <tr><td>Display styles</td><td>Classic needle dial, Sport LED arc, large Digital readout and a mirrored windshield HUD, all fed by the same state</td><td>Canvas 2D</td></tr>
+      <tr><td>Drive mode</td><td>Hides everything except the dial, goes full screen and keeps the screen on</td><td>Fullscreen, Screen Wake Lock</td></tr>
       <tr><td>Gauge renderer</td><td>Draws the dial, ticks, limit band and spring-damped needle on a HiDPI canvas</td><td>Canvas 2D, <code>requestAnimationFrame</code></td></tr>
       <tr><td>Settings store</td><td>Remembers units and the limit on this device</td><td><code>localStorage</code></td></tr>
       <tr><td>Wake lock</td><td>Stops the phone screen dimming while driving</td><td>Screen Wake Lock</td></tr>
@@ -254,6 +283,7 @@ ul{padding-left:20px}
     <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS, simulator, or an OBD-II adapter later).</li>
     <li><strong>Canvas for the dial, DOM for text.</strong> The dial redraws every frame on a <code>devicePixelRatio</code>-scaled canvas; numbers stay as real text so they are crisp, selectable and readable by screen readers.</li>
     <li><strong>Accessible at sensor rate.</strong> A polite live region announces speed every few seconds, not 60 times a second.</li>
+    <li><strong>Swappable faces.</strong> Each display style is one draw function reading the same state, so adding a new face never touches the sensor or filter code.</li>
     <li><strong>Theme-aware.</strong> The canvas reads its colours from CSS tokens, so light and dark mode match the rest of the page.</li>
   </ul>
 </section>
@@ -366,6 +396,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     unit: UNITS[store.get("unit", "kmh")] ? store.get("unit", "kmh") : "kmh",
     limitMs: store.get("limitMs", 100 / 3.6),
     mode: "sim",
+    style: ["classic", "sport", "digital", "hud"].includes(store.get("style", "classic")) ? store.get("style", "classic") : "classic",
     est: 0, shown: 0, vel: 0,
     lastRecv: 0, acc: null,
     trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
@@ -492,7 +523,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
   let T = {};
   function readTokens() {
     const cs = getComputedStyle(document.documentElement);
-    ["ink", "muted", "line", "accent", "alert", "needle", "face", "panel", "alert-soft", "accent-soft"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
+    ["ink", "muted", "line", "accent", "alert", "needle", "face", "panel", "alert-soft", "accent-soft", "ok"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
   }
   readTokens();
   matchMedia("(prefers-color-scheme: dark)").addEventListener?.("change", readTokens);
@@ -513,7 +544,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
 
   // ---------- Gauge ----------
   const A0 = 0.75 * Math.PI, SWEEP = 1.5 * Math.PI;
-  function drawGauge() {
+  function drawClassic() {
     const { ctx, w, h, dpr } = G; if (!w) return;
     const U = UNITS[state.unit];
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
@@ -573,6 +604,77 @@ v += acc * dt; x += v * dt;</code></pre></li>
     ctx.restore();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.055, 0, Math.PI * 2); ctx.fillStyle = T.ink; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.022, 0, Math.PI * 2); ctx.fillStyle = T.needle; ctx.fill();
+  }
+
+  // ---------- Display style dispatcher ----------
+  function prep() {
+    const { ctx, w, h, dpr } = G;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h, U: UNITS[state.unit] };
+  }
+  function drawGauge() {
+    if (!G.w) return;
+    ({ classic: drawClassic, sport: drawSport, digital: drawDigital, hud: drawHud })[state.style]();
+  }
+  function roundBar(ctx, x, y, w, h) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
+  }
+  const DISPLAY_FONT = '"Saira Condensed","Arial Narrow",sans-serif', MONO_FONT = '"IBM Plex Mono",ui-monospace,monospace';
+
+  // Sport: segmented LED arc, green → amber → red relative to the limit
+  function drawSport() {
+    const { ctx, w, h, U } = prep();
+    const cx = w / 2, cy = h * 0.56, R = Math.min(w * 0.44, h * 0.48);
+    const s = Math.PI * 160 / 180, sweep = Math.PI * 220 / 180, N = 44, gap = 0.012;
+    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
+    ctx.lineWidth = R * 0.15; ctx.lineCap = "butt";
+    for (let i = 0; i < N; i++) {
+      const v0 = U.max * i / N, lit = v0 < shownU - 1e-6;
+      const col = v0 >= limU ? T.alert : v0 >= limU * 0.8 ? T.accent : T.ok;
+      ctx.strokeStyle = lit ? col : (v0 >= limU ? T["alert-soft"] : T.line);
+      ctx.beginPath(); ctx.arc(cx, cy, R * 0.82, s + sweep * i / N + gap, s + sweep * (i + 1) / N - gap); ctx.stroke();
+    }
+    const fs = Math.max(11, R * 0.08);
+    ctx.font = `600 ${fs}px ${DISPLAY_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    for (let v = 0; v <= U.max + 1e-6; v += U.major * 2) {
+      const a = s + sweep * v / U.max;
+      ctx.fillStyle = v >= limU ? T.alert : T.muted;
+      ctx.fillText(String(v), cx + Math.cos(a) * R * 1.03, cy + Math.sin(a) * R * 1.03);
+    }
+    ctx.fillStyle = T.muted; ctx.font = `500 ${Math.max(11, R * 0.06)}px ${MONO_FONT}`;
+    ctx.fillText(`MAX ${Math.round(state.trip.max * U.f)}  ·  TRIP ${(state.trip.dist * U.df).toFixed(1)} ${U.dist.toUpperCase()}`, cx, h * 0.9);
+  }
+
+  // Digital: huge number (DOM) with a linear bar and three key figures
+  function drawDigital() {
+    const { ctx, w, h, U } = prep();
+    const x0 = w * 0.08, x1 = w * 0.92, y = h * 0.66, bh = Math.max(10, h * 0.035);
+    const shownU = state.shown * U.f, limU = state.limitMs * U.f;
+    const X = v => x0 + (x1 - x0) * Math.min(Math.max(v / U.max, 0), 1);
+    roundBar(ctx, x0, y, x1 - x0, bh); ctx.fillStyle = T.line; ctx.fill();
+    if (shownU > 0.05) { roundBar(ctx, x0, y, Math.max(bh, X(shownU) - x0), bh); ctx.fillStyle = shownU > limU ? T.alert : T.accent; ctx.fill(); }
+    if (limU < U.max) { ctx.fillStyle = T.alert; ctx.fillRect(X(limU) - 1, y - 6, 2, bh + 12); }
+    ctx.font = `500 ${Math.max(11, w * 0.027)}px ${MONO_FONT}`; ctx.fillStyle = T.muted; ctx.textBaseline = "top";
+    [[0, "left"], [U.max / 2, "center"], [U.max, "right"]].forEach(([v, al]) => { ctx.textAlign = al; ctx.fillText(String(v), X(v), y + bh + 8); });
+    const items = [["LIMIT", Math.round(limU)], ["TOP", Math.round(state.trip.max * U.f)], ["AVG", state.trip.moving > 1 ? Math.round(state.trip.dist / state.trip.moving * U.f) : 0]];
+    items.forEach(([k, v], i) => {
+      const cx = w * (0.2 + 0.3 * i);
+      ctx.textAlign = "center"; ctx.textBaseline = "alphabetic";
+      ctx.fillStyle = T.muted; ctx.font = `500 ${Math.max(10, w * 0.025)}px ${MONO_FONT}`; ctx.fillText(k, cx, h * 0.84);
+      ctx.fillStyle = k === "LIMIT" ? T.alert : T.ink; ctx.font = `600 ${Math.max(18, w * 0.065)}px ${DISPLAY_FONT}`; ctx.fillText(String(v), cx, h * 0.95);
+    });
+  }
+
+  // HUD: high-contrast night display; mirror it to read as a windshield reflection
+  function drawHud() {
+    const { ctx, w, h, U } = prep();
+    const over = state.shown > state.limitMs + 0.05, col = over ? "#ff5b52" : "#7dffb0";
+    const x0 = w * 0.12, x1 = w * 0.88, y = h * 0.74, bh = Math.max(6, h * 0.022);
+    ctx.fillStyle = col; ctx.globalAlpha = 0.22; ctx.fillRect(x0, y, x1 - x0, bh); ctx.globalAlpha = 1;
+    ctx.fillRect(x0, y, (x1 - x0) * Math.min(state.shown * U.f / U.max, 1), bh);
+    ctx.font = `600 ${Math.max(14, h * 0.05)}px ${DISPLAY_FONT}`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.fillText(`LIMIT ${Math.round(state.limitMs * U.f)}`, w / 2, h * 0.87);
   }
 
   // ---------- Sparkline ----------
@@ -691,7 +793,37 @@ v += acc * dt; x += v * dt;</code></pre></li>
   };
   document.addEventListener("visibilitychange", () => { if (wakeLock && document.visibilityState === "visible") requestWake(); });
 
+  // ---------- Display style + drive mode ----------
+  function applyStyle() {
+    const d = $(".dial");
+    d.dataset.style = state.style;
+    document.querySelectorAll("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === state.style));
+    $("#mirrorBtn").hidden = state.style !== "hud";
+    if (state.style !== "hud") { d.classList.remove("mirror"); $("#mirrorBtn").setAttribute("aria-pressed", "false"); }
+    document.body.classList.toggle("hudbg", state.style === "hud");
+  }
+  document.querySelectorAll("#styleSeg button").forEach(b => b.onclick = () => { state.style = b.dataset.st; store.set("style", state.style); applyStyle(); });
+  $("#mirrorBtn").onclick = e => {
+    const on = $(".dial").classList.toggle("mirror");
+    e.currentTarget.setAttribute("aria-pressed", on);
+  };
+  function setDrive(on) {
+    document.body.classList.toggle("drive", on);
+    const btn = $("#driveBtn");
+    btn.setAttribute("aria-pressed", on); btn.textContent = on ? "Exit drive mode" : "Drive mode";
+    if (on) {
+      const p = document.documentElement.requestFullscreen?.(); if (p) p.catch(() => {});
+      if (!wakeLock) requestWake().then(ok => { if (ok) { $("#wakeBtn").setAttribute("aria-pressed", "true"); $("#wakeBtn").textContent = "Screen stays on"; } });
+      window.scrollTo(0, 0);
+    } else if (document.fullscreenElement) {
+      const p = document.exitFullscreen?.(); if (p) p.catch(() => {});
+    }
+  }
+  $("#driveBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
+  document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("drive")) setDrive(false); });
+
   applyUnit();
+  applyStyle();
   useSource("sim");
   requestAnimationFrame(frame);
 })();
