@@ -128,6 +128,25 @@ body.drive .dial{width:min(100%,86dvh,640px)}
 .dockbtn[aria-pressed="true"].recb .rdot{background:var(--panel);animation:pulse 1.2s infinite}
 .dockbtn[aria-pressed="true"].bell{border-color:var(--ok);color:var(--ok)}
 body.drive .dock, body.drive .mini{display:none}
+/* location gate: speedometer locked and blurred until GPS is allowed */
+.drive{position:relative}
+.gated .stage, .gated .dock{filter:blur(7px) grayscale(.7);opacity:.45;pointer-events:none;user-select:none;transition:filter .3s,opacity .3s}
+.gate{position:absolute;inset:calc(env(safe-area-inset-top,0px) + 70px) 16px 16px;display:grid;place-items:center;z-index:5}
+.gatecard{width:100%;max-width:400px;background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:22px 20px;box-shadow:0 18px 50px rgba(0,0,0,.18);max-height:100%;overflow:auto}
+.gateicon{width:52px;height:52px;border-radius:50%;background:var(--accent-soft);display:grid;place-items:center;margin-bottom:14px}
+.gateicon svg{width:26px;height:26px;stroke:var(--accent);fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.gate[data-kind="denied"] .gateicon, .gate[data-kind="off"] .gateicon{background:var(--alert-soft)}
+.gate[data-kind="denied"] .gateicon svg, .gate[data-kind="off"] .gateicon svg{stroke:var(--alert)}
+.gate[data-kind="requesting"] .gateicon{animation:pulse 1.6s infinite}
+.gatecard h2{font-size:26px;margin-bottom:6px}
+.gatecard p{color:var(--muted);margin-bottom:12px}
+.gatecard ol{margin:0 0 14px;padding-left:20px;font-size:14px}
+.gatecard ol li{margin-bottom:6px}
+.gatecard .platform{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);margin-bottom:6px}
+.gatebtns{display:flex;flex-direction:column;gap:8px}
+.gatebtns .dockbtn{flex:none}
+.dockbtn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.linkbtn{background:none;border:0;color:var(--muted);font-size:13px;text-decoration:underline;cursor:pointer;padding:6px}
 body.drive .tabs{display:none}
 body.drive .app{padding-bottom:0}
 body.drive .drive{min-height:100dvh}
@@ -218,7 +237,7 @@ ul{padding-left:20px}
   <!-- ===================== DRIVE ===================== -->
   <section class="view drive" data-view="drive" aria-label="Speedometer">
     <div class="drivebar">
-      <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Demo drive</span></div>
+      <div class="status" id="status" data-s="wait" role="status"><span class="dot"></span><span id="statusText">Starting GPS</span></div>
       <div class="right">
         <span class="recpill" id="recPill" hidden><span class="dot"></span><span id="recPillT">REC 0:00</span></span>
         <button class="iconbtn" id="fsBtn" aria-pressed="false" aria-label="Drive mode: full screen, screen stays on">
@@ -241,10 +260,7 @@ ul{padding-left:20px}
     </div>
     <div class="dock" aria-label="Quick controls">
       <div class="dockrow">
-        <div class="seg" role="group" aria-label="Speed source">
-          <button id="modeGps" aria-pressed="false">GPS</button>
-          <button id="modeSim" aria-pressed="true">Demo</button>
-        </div>
+        <button class="dockbtn bell" id="soundBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="soundBtnT">Speed alert off</span></button>
         <div class="limitctl" role="group" aria-label="Speed limit">
           <button id="limDown" aria-label="Lower speed limit">−</button>
           <span class="sign" id="limitSign" aria-live="polite">100</span>
@@ -265,7 +281,18 @@ ul{padding-left:20px}
       </div>
       <div class="dockrow">
         <button class="dockbtn recb" id="recBtnD" aria-pressed="false"><span class="rdot"></span><span id="recBtnDT">Record trip</span></button>
-        <button class="dockbtn bell" id="soundBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="soundBtnT">Speed alert off</span></button>
+      </div>
+    </div>
+    <div class="gate" id="gate" hidden role="dialog" aria-modal="false" aria-labelledby="gateTitle">
+      <div class="gatecard">
+        <div class="gateicon"><svg viewBox="0 0 24 24"><path d="M12 21s-7-6.2-7-11.5a7 7 0 0 1 14 0C19 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg></div>
+        <h2 id="gateTitle">Allow location to start</h2>
+        <p id="gateText">Pacer reads your speed from your phone's GPS. Tap Allow when your browser asks.</p>
+        <div id="gateSteps"></div>
+        <div class="gatebtns">
+          <button class="dockbtn primary" id="gateBtn">Enable location</button>
+          <button class="linkbtn" id="gateReload">Still stuck? Reload the page</button>
+        </div>
       </div>
     </div>
     <div class="sr" id="live" aria-live="polite"></div>
@@ -338,7 +365,7 @@ ul{padding-left:20px}
 
       <div class="eyebrow gh">Location</div>
       <div class="group">
-        <p class="note" id="note" style="border-top:0">Tap GPS on the Drive screen and allow location when your browser asks. Speed is most accurate outdoors with a clear view of the sky.</p>
+        <p class="note" id="note" style="border-top:0">Pacer starts GPS when it opens and asks for location once. If you blocked it, the Drive screen shows how to turn it back on. Speed is most accurate outdoors with a clear view of the sky.</p>
       </div>
       <p class="muted" style="font-size:13px;margin:14px 4px 0">Units, style, speed limit, alerts and recording are on the Drive screen, where you use them.</p>
     </div>
@@ -362,7 +389,7 @@ ul{padding-left:20px}
     <thead><tr><th>Component</th><th>Responsibility</th><th>Web API</th></tr></thead>
     <tbody>
       <tr><td>GpsSource</td><td>Streams position fixes with Doppler speed and accuracy radius</td><td><code>geolocation.watchPosition</code></td></tr>
-      <tr><td>SimSource</td><td>Replays a drive cycle with sensor noise at 2 Hz for testing and demos</td><td><code>setInterval</code></td></tr>
+      <tr><td>Location gate</td><td>Starts GPS on load, asks for permission, and locks and blurs the speedometer with device-specific steps until location works</td><td>Permissions API</td></tr>
       <tr><td>Fix validator</td><td>Drops fixes with accuracy worse than 50 m, impossible jumps and stale timestamps</td><td>—</td></tr>
       <tr><td>SpeedKalman</td><td>1-D Kalman filter that fuses noisy readings into a smooth speed estimate</td><td>—</td></tr>
       <tr><td>Haversine fallback</td><td>Derives speed from distance ÷ time when the device reports no Doppler speed</td><td>—</td></tr>
@@ -386,11 +413,11 @@ ul{padding-left:20px}
   <h2>Design</h2>
   <p>Data flows in one direction. The sensor runs at about 1 Hz while the screen runs at 60 fps, so the two are decoupled: fixes update the estimate, and the render loop animates toward it.</p>
   <div class="diagram">
-    <svg viewBox="0 0 760 210" role="img" aria-label="Pipeline: GPS or simulator, validator, Kalman filter, state, then gauge, trip computer and alerts">
+    <svg viewBox="0 0 760 210" role="img" aria-label="Pipeline: permission gate, GPS, validator, Kalman filter, state, then gauge, trip computer and alerts">
       <defs><marker id="ar" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L10 5L0 10z" fill="var(--muted)"/></marker></defs>
       <g font-family="IBM Plex Sans, system-ui, sans-serif" font-size="13" fill="var(--ink)">
         <rect x="10" y="30" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="57" text-anchor="middle">GpsSource</text>
-        <rect x="10" y="120" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="147" text-anchor="middle">SimSource</text>
+        <rect x="10" y="120" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="70" y="147" text-anchor="middle">Permission gate</text>
         <rect x="170" y="75" width="120" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="230" y="102" text-anchor="middle">Validator</text>
         <rect x="330" y="75" width="120" height="44" rx="8" fill="var(--accent-soft)" stroke="var(--accent)"/><text x="390" y="102" text-anchor="middle">Kalman filter</text>
         <rect x="490" y="75" width="90" height="44" rx="8" fill="var(--panel)" stroke="var(--line)"/><text x="535" y="102" text-anchor="middle">State</text>
@@ -412,7 +439,7 @@ ul{padding-left:20px}
     <li><strong>One job per screen.</strong> Drive shows only speed, the limit sign and recording state, so a glance takes well under a second. Trip data, settings and these notes sit one tap away in the tab bar, which stays within thumb reach.</li>
     <li><strong>One page, many screens.</strong> Screens swap inside a single page instead of loading new files, so GPS, the filter, the trip computer and recording never restart when you switch tabs.</li>
     <li><strong>SI units inside.</strong> All maths runs in metres and seconds. Units are converted only at display time, so switching km/h ↔ mph never corrupts trip data.</li>
-    <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS, simulator, or an OBD-II adapter later).</li>
+    <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS today, an OBD-II adapter later).</li>
     <li><strong>Canvas for the dial, DOM for text.</strong> The dial redraws every frame on a <code>devicePixelRatio</code>-scaled canvas; numbers stay as real text so they are crisp, selectable and readable by screen readers.</li>
     <li><strong>Accessible at sensor rate.</strong> A polite live region announces speed every few seconds, not 60 times a second.</li>
     <li><strong>Swappable faces.</strong> Each display style is one draw function reading the same state, so adding a new face never touches the sensor or filter code.</li>
@@ -447,7 +474,7 @@ x ← x + ẋ · Δt</div>
   <h2>Implementation</h2>
   <ol class="steps">
     <li><strong>Scaffold one HTML file</strong> with a square container holding a <code>&lt;canvas&gt;</code> and an overlaid text readout. Serve it over HTTPS; browsers expose geolocation only in secure contexts.</li>
-    <li><strong>Write the sensor adapter.</strong> Wrap <code>watchPosition</code> with <code>enableHighAccuracy: true</code> and <code>maximumAge: 0</code>. Map each position to <code>{t, lat, lon, acc, speed}</code>. Handle error code 1 (denied) by switching to the simulator, and codes 2 and 3 by showing a "waiting for fix" state.
+    <li><strong>Write the sensor adapter.</strong> Wrap <code>watchPosition</code> with <code>enableHighAccuracy: true</code> and <code>maximumAge: 0</code>. Map each position to <code>{t, lat, lon, acc, speed}</code>. Handle error code 1 (denied) by locking the speedometer behind the location gate, code 2 by asking the user to turn on location services, and code 3 by showing a "searching for signal" state.
 <pre><code>watchPosition(p =&gt; onFix({
   t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude,
   acc: p.coords.accuracy, speed: p.coords.speed
@@ -477,7 +504,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     <li><strong>Add the trip computer and sparkline.</strong> Integrate distance per frame, sample speed every 500 ms into a 120-point ring buffer and plot it with the limit as a dashed line.</li>
     <li><strong>Add alerts.</strong> When the needle passes the limit, set an <code>.over</code> class for the red state and play a short Web Audio tone every 1.5 s. Start audio only after a tap, as browsers require.</li>
     <li><strong>Persist settings and hold the screen.</strong> Save units and limit to <code>localStorage</code> inside try/catch. Request <code>navigator.wakeLock.request('screen')</code> and re-request it on <code>visibilitychange</code>.</li>
-    <li><strong>Test with the simulator</strong>, which runs a city–highway–overspeed–braking cycle with Gaussian noise, then test on a real phone outdoors with a clear sky view.</li>
+    <li><strong>Gate on permission.</strong> Query <code>navigator.permissions</code> for <code>geolocation</code>, start <code>watchPosition</code> on load, and lock the speedometer behind instructions while the state is denied or location services are off. Re-check on <code>permissions.onchange</code> and when the page becomes visible again. Then test on a real phone outdoors with a clear sky view.</li>
   </ol>
 </section>
 
@@ -487,7 +514,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
   <ol class="steps">
     <li>Rename the downloaded file to <code>index.html</code>.</li>
     <li>Host it on any HTTPS static host: drag it onto Netlify Drop, push it to a GitHub Pages repo, or run <code>npx vercel</code> in its folder.</li>
-    <li>Open the HTTPS address on your phone, choose <strong>Device GPS</strong> and allow location.</li>
+    <li>Open the HTTPS address on your phone and allow location when asked.</li>
     <li>Optional: add a web app manifest and a service worker so it installs to the home screen and works offline.</li>
   </ol>
   <h3>Production checklist</h3>
@@ -539,7 +566,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
     limitMs: pick("limitMs", 100 / 3.6, v => typeof v === "number" && v > 0),
     style: pick("style", "classic", v => STYLES.includes(v)),
     mirror: store.get("mirror", false) === true,
-    mode: "sim",
     est: 0, shown: 0, vel: 0, lastRecv: 0, acc: null,
     trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
     hist: [], sound: false,
@@ -618,7 +644,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     if (z === null || z > MAX_SPEED) return;
     state.est = kf.update(z, r, f.t);
     afterEstimate(f);
-    if (state.mode === "gps") setStatus("ok", "GPS · ±" + Math.round(f.acc || 0) + " m");
+    setStatus("ok", "GPS · ±" + Math.round(f.acc || 0) + " m");
   }
 
   // ---------- Sources ----------
@@ -635,66 +661,95 @@ v += acc * dt; x += v * dt;</code></pre></li>
     stop() { if (this.id != null) { try { navigator.geolocation.clearWatch(this.id); } catch {} } this.id = null; }
   }
 
-  const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
-  class SimSource {
-    constructor() {
-      this.plan = [
-        { v: 0, a: 2, b: 3, hold: 3 }, { v: 13.9, a: 2.6, b: 3, hold: 7 }, { v: 0, a: 2, b: 3.2, hold: 3 },
-        { v: 27.8, a: 2.3, b: 2, hold: 6 }, { v: 32.5, a: 1.1, b: 2, hold: 6 }, { v: 25, a: 2, b: 1.6, hold: 5 },
-        { v: 8.3, a: 2, b: 2.4, hold: 4 }, { v: 0, a: 2, b: 2.8, hold: 2 }
-      ];
+
+  // ---------- Location gate ----------
+  const UA = navigator.userAgent;
+  const PLATFORM = /iPhone|iPad|iPod/.test(UA) || (/Macintosh/.test(UA) && navigator.maxTouchPoints > 1) ? "ios" : /Android/.test(UA) ? "android" : "desktop";
+  const STEPS = {
+    denied: {
+      ios: ["Tap <b>aA</b> in Safari's address bar, then <b>Website Settings → Location → Allow</b>.",
+            "Still blocked? Open <b>Settings → Privacy &amp; Security → Location Services → Safari Websites</b> and choose <b>While Using the App</b>. In Chrome, use <b>Settings → Chrome → Location</b>.",
+            "Come back here and tap <b>Try again</b>."],
+      android: ["Tap the icon to the left of the address bar, then <b>Permissions → Location → Allow</b>.",
+                "Check that <b>Location</b> is on in your phone's quick settings (swipe down from the top).",
+                "Tap <b>Try again</b>. If nothing changes, reload the page."],
+      desktop: ["Click the icon to the left of the address bar and set <b>Location</b> to <b>Allow</b>.",
+                "Reload the page."]
+    },
+    off: {
+      ios: ["Open <b>Settings → Privacy &amp; Security → Location Services</b> and turn it on.",
+            "In the same list, set <b>Safari Websites</b> (or Chrome) to <b>While Using the App</b>.",
+            "Come back here and tap <b>Try again</b>."],
+      android: ["Swipe down from the top of the screen and turn on <b>Location</b>.",
+                "Go outdoors or near a window so GPS can get a fix.",
+                "Tap <b>Try again</b>."],
+      desktop: ["Turn on location services in your computer's privacy settings.",
+                "Reload the page."]
     }
-    start(onFix) {
-      this.v = 0; this.i = 0; this.hold = 0; this.last = performance.now();
-      this.lat = 12.9716; this.lon = 77.5946; this.hdg = 35; this.alt = 905; this.clock = 0;
-      this.timer = setInterval(() => {
-        const now = performance.now(), dt = Math.min((now - this.last) / 1000, 2); this.last = now;
-        this.step(dt);
-        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4,
-          lat: this.lat, lon: this.lon, heading: this.v > 0.8 ? this.hdg : NaN, alt: this.alt + gauss() * 0.8 });
-      }, 500);
-    }
-    step(dt) {
-      this.clock += dt;
-      this.hdg = (this.hdg + Math.sin(this.clock / 7) * 9 * dt * Math.min(this.v / 5, 1) + 360) % 360;
-      const d = this.v * dt;
-      this.lat += d * Math.cos(toRad(this.hdg)) / 111320;
-      this.lon += d * Math.sin(toRad(this.hdg)) / (111320 * Math.cos(toRad(this.lat)));
-      this.alt = 905 + 14 * Math.sin(this.clock / 45);
-      const s = this.plan[this.i], diff = s.v - this.v;
-      if (Math.abs(diff) < 0.15) {
-        this.v = s.v; this.hold += dt;
-        if (this.hold >= s.hold) { this.i = (this.i + 1) % this.plan.length; this.hold = 0; }
-      } else {
-        const rate = diff > 0 ? s.a : s.b;
-        this.v += Math.sign(diff) * Math.min(Math.abs(diff), rate * dt);
-      }
-    }
-    stop() { clearInterval(this.timer); }
+  };
+  const PLATFORM_NAME = { ios: "On iPhone / iPad", android: "On Android", desktop: "On this computer" };
+  let gateKind = null;
+  function setGate(kind) {
+    gateKind = kind;
+    const g = $("#gate"), on = !!kind;
+    document.body.classList.toggle("gated", on);
+    g.hidden = !on;
+    $(".stage").inert = on; $(".dock").inert = on;
+    if (!on) return;
+    g.dataset.kind = kind;
+    const secureUrl = "https://" + location.host + location.pathname;
+    const copy = {
+      requesting: ["Allow location to start", "Pacer reads your speed from your phone's GPS. Tap Allow when your browser asks.", "Enable location"],
+      denied: ["Location is blocked", "Pacer can't show your speed until this site is allowed to use your location.", "Try again"],
+      off: ["Turn on location services", "Your phone's location is switched off, or it can't find a position yet.", "Try again"],
+      insecure: ["Open the secure link", location.protocol === "http:" ? "Location only works over HTTPS. Open " + secureUrl : "Location only works when the page is opened from an HTTPS web address, not from a saved file.", "Open secure link"],
+      unsupported: ["Location isn't supported", "This browser can't share your location. Open Pacer in Safari or Chrome.", ""]
+    }[kind];
+    $("#gateTitle").textContent = copy[0];
+    $("#gateText").textContent = copy[1];
+    $("#gateBtn").textContent = copy[2];
+    $("#gateBtn").hidden = !copy[2] || (kind === "insecure" && location.protocol !== "http:");
+    const steps = STEPS[kind]?.[PLATFORM];
+    $("#gateSteps").innerHTML = steps ? `<div class="platform">${PLATFORM_NAME[PLATFORM]}</div><ol>${steps.map(x => `<li>${x}</li>`).join("")}</ol>` : "";
+    $("#gateReload").hidden = !(kind === "denied" || kind === "off");
+    setStatus(kind === "requesting" ? "wait" : "bad", kind === "requesting" ? "Waiting for permission" : "Location needed");
   }
 
-  let source = null;
-  function useSource(mode) {
+  let source = null, gotFirst = false;
+  function startGps() {
+    if (!window.isSecureContext) return setGate("insecure");
+    if (!("geolocation" in navigator)) return setGate("unsupported");
     if (source) source.stop();
-    kf.reset(); prevFix = null; state.est = 0; state.hdg = null;
-    state.mode = mode;
-    $("#modeSim").setAttribute("aria-pressed", mode === "sim");
-    $("#modeGps").setAttribute("aria-pressed", mode === "gps");
-    if (mode === "sim") {
-      source = new SimSource(); source.start(onFix);
-      setStatus("sim", "Demo drive");
-    } else {
-      source = new GpsSource();
-      setStatus("wait", "Waiting for GPS fix");
-      source.start(onFix, (code, msg) => {
-        if (code === 1) {
-          $("#note").textContent = msg + " Allow location for this site in your browser settings, then tap GPS again.";
-          useSource("sim");
-          setStatus("bad", "Location blocked · see Settings");
-        } else setStatus("wait", msg);
-      });
-    }
+    kf.reset(); prevFix = null; state.est = 0; state.hdg = null; gotFirst = false;
+    source = new GpsSource();
+    source.start(f => {
+      gotFirst = true;
+      if (gateKind) setGate(null);
+      onFix(f);
+    }, code => {
+      if (code === 1) setGate("denied");
+      else if (code === 2 && !gotFirst) setGate("off");
+      else if (code === 2) setStatus("bad", "Signal lost");
+      else { if (gateKind === "requesting") setGate(null); setStatus("wait", "Searching for GPS signal"); }
+    });
+    if (!gotFirst) setStatus("wait", "Searching for GPS signal");
   }
+  async function bootLocation() {
+    let perm = null;
+    try { perm = await navigator.permissions?.query({ name: "geolocation" }); } catch {}
+    if (perm) {
+      if (perm.state === "prompt") setGate("requesting");
+      else if (perm.state === "denied") setGate("denied");
+      perm.onchange = () => { if (perm.state === "granted") startGps(); else if (perm.state === "denied") setGate("denied"); };
+    } else setGate("requesting");
+    if (!perm || perm.state !== "denied") startGps();
+  }
+  $("#gateBtn").onclick = () => {
+    if (gateKind === "insecure") { location.href = "https://" + location.host + location.pathname; return; }
+    setGate("requesting"); startGps();
+  };
+  $("#gateReload").onclick = () => location.reload();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && (gateKind === "denied" || gateKind === "off")) startGps(); });
   function setStatus(s, text) { $("#status").dataset.s = s; $("#statusText").textContent = text; }
 
   // ---------- Theme tokens for canvas ----------
@@ -940,7 +995,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
   function frame(now) {
     const dt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
     const target = state.est;
-    if (state.mode === "gps" && state.lastRecv && now - state.lastRecv > 5000) setStatus("bad", "Signal lost");
+    if (!gateKind && state.lastRecv && now - state.lastRecv > 5000) setStatus("bad", "Signal lost");
     if (reduceMotion) { state.shown = target; state.vel = 0; }
     else {
       const w = 6, a = w * w * (target - state.shown) - 2 * w * state.vel;
@@ -981,8 +1036,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
   $("#mirrorSw").onclick = () => { state.mirror = !state.mirror; store.set("mirror", state.mirror); applyStyle(); };
 
   // ---------- Controls ----------
-  $("#modeSim").onclick = () => useSource("sim");
-  $("#modeGps").onclick = () => useSource("gps");
   document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => {
     state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips();
   });
@@ -1083,7 +1136,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     if (rec.points.length < 2) { $("#recInfo").textContent = "Nothing to save yet. Record for a few seconds while moving."; return; }
     let pts = rec.points; const step = Math.ceil(pts.length / 1500); if (step > 1) pts = pts.filter((_, i) => i % step === 0);
     const tr = { id: rec.start, start: rec.start, dur: (Date.now() - rec.start) / 1000, dist: state.trip.dist - rec.trip0.dist,
-      max: Math.max(...rec.points.map(p => p[4])), mode: state.mode, pts };
+      max: Math.max(...rec.points.map(p => p[4])), mode: "gps", pts };
     const trips = loadTrips(); trips.push(tr); while (trips.length > 15) trips.shift();
     store.set("trips", trips);
     const saved = loadTrips().some(t => t.id === tr.id);
@@ -1123,8 +1176,8 @@ v += acc * dt; x += v * dt;</code></pre></li>
   applyUnit();
   applyStyle();
   renderTrips();
-  useSource("sim");
   route();
+  bootLocation();
   requestAnimationFrame(frame);
 })();
 </script>

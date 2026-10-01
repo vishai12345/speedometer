@@ -14,14 +14,14 @@ All screens live in one page, so GPS and recording keep running while you switch
 
 ## Use
 1. Open the live link on your phone in Safari or Chrome.
-2. Tap **Device GPS** and allow location.
+2. Allow location when your browser asks.
 3. Go outdoors with a clear view of the sky.
 
 **Display styles:** Classic needle dial, Sport LED arc, large Digital readout, and HUD (mirrorable for windshield reflection at night). **Drive mode** shows only the dial, full screen, with the screen kept on.
 
 **Also included:** compass heading, altitude, G meter, automatic 0–100 km/h (0–60 mph) timer, trip recording with GPX/CSV export, chime + vibration speed alerts, green/amber/red speed zones, a top-speed marker on the dial, knots, and Auto/Day/Night themes.
 
-The **Simulator** mode replays a test drive, so you can try the app without moving.
+GPS starts as soon as the page opens. Until location is allowed, the speedometer stays locked and shows steps for turning location on for your device.
 
 ## Deploy
 The whole app is one file, `index.html`, with no build step. GitHub Pages serves it from `main` / root over HTTPS, which browsers require for location access.
