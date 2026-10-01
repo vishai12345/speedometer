@@ -80,13 +80,14 @@ button,input{font:inherit;color:inherit}
 .status[data-s="sim"] .dot{background:var(--accent)}
 .status[data-s="bad"] .dot{background:var(--alert)}
 .status[data-s="wait"] .dot{animation:pulse 1.2s infinite}
-.recpill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--alert);font-variant-numeric:tabular-nums}
+.recpill{white-space:nowrap;display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--alert);font-variant-numeric:tabular-nums}
 .recpill .dot{background:var(--alert);animation:pulse 1.2s infinite}
 .sign{width:44px;height:44px;border-radius:50%;border:4px solid var(--alert);background:var(--panel);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:-.02em;line-height:1;color:var(--ink);text-decoration:none;flex:none}
 .iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;cursor:pointer;flex:none}
 .iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
 .stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%}
-.dial{position:relative;width:min(100%,64dvh,560px);aspect-ratio:1;container-type:inline-size;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:50%}
+.dial{position:relative;width:clamp(240px,calc(100dvh - 450px),540px);max-width:100%;aspect-ratio:1;container-type:inline-size;border-radius:50%}
+body.drive .dial{width:min(100%,86dvh,640px)}
 .dial canvas{position:absolute;inset:0;width:100%;height:100%}
 .readout{position:absolute;left:0;right:0;top:55%;text-align:center;pointer-events:none}
 .readout .v{font-family:var(--f-display);font-weight:700;font-size:21cqw;line-height:.9;font-variant-numeric:tabular-nums;transition:color .2s}
@@ -110,6 +111,23 @@ button,input{font:inherit;color:inherit}
 .dots i{width:6px;height:6px;border-radius:3px;background:var(--line);transition:width .25s,background-color .25s}
 .dots i.on{width:18px;background:var(--accent)}
 .picker .hint{font-size:12px;color:var(--muted)}
+/* quick controls on the Drive screen */
+.mini{display:flex;justify-content:center;gap:18px;flex-wrap:wrap;text-decoration:none;color:var(--muted);font-family:var(--f-mono);font-size:12px;letter-spacing:.06em;text-transform:uppercase}
+.mini b{font-family:var(--f-display);font-size:19px;font-weight:600;color:var(--ink);letter-spacing:0;margin-left:5px;font-variant-numeric:tabular-nums;text-transform:none}
+.dock{width:100%;max-width:560px;display:flex;flex-direction:column;gap:10px}
+.dockrow{display:flex;gap:10px;align-items:stretch;min-width:0}
+.dock .seg{display:grid;grid-auto-flow:column;grid-auto-columns:minmax(0,1fr);width:100%;border-radius:10px}
+.dock .seg button{min-height:44px;padding:6px 4px}
+.dockrow > .seg{flex:1;width:auto}
+.limitctl{display:flex;align-items:center;gap:6px;flex:none}
+.limitctl button{width:40px;height:44px;border-radius:10px;border:1px solid var(--line);background:var(--panel);font-size:19px;cursor:pointer}
+.dockbtn{flex:1;min-height:46px;border:1px solid var(--line);background:var(--panel);border-radius:10px;font-weight:600;font-size:14px;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:background-color .15s,border-color .15s,color .15s}
+.dockbtn svg{width:18px;height:18px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.dockbtn .rdot{width:10px;height:10px;border-radius:50%;background:var(--alert)}
+.dockbtn[aria-pressed="true"].recb{background:var(--alert);border-color:var(--alert);color:var(--panel)}
+.dockbtn[aria-pressed="true"].recb .rdot{background:var(--panel);animation:pulse 1.2s infinite}
+.dockbtn[aria-pressed="true"].bell{border-color:var(--ok);color:var(--ok)}
+body.drive .dock, body.drive .mini{display:none}
 body.drive .tabs{display:none}
 body.drive .app{padding-bottom:0}
 body.drive .drive{min-height:100dvh}
@@ -200,17 +218,16 @@ ul{padding-left:20px}
   <!-- ===================== DRIVE ===================== -->
   <section class="view drive" data-view="drive" aria-label="Speedometer">
     <div class="drivebar">
-      <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Simulated drive</span></div>
+      <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Demo drive</span></div>
       <div class="right">
         <span class="recpill" id="recPill" hidden><span class="dot"></span><span id="recPillT">REC 0:00</span></span>
-        <a class="sign" id="limitSign" href="#settings" aria-label="Speed limit, tap to change">100</a>
         <button class="iconbtn" id="fsBtn" aria-pressed="false" aria-label="Drive mode: full screen, screen stays on">
           <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
         </button>
       </div>
     </div>
     <div class="stage">
-      <div class="dial" id="dial" role="button" tabindex="0" aria-label="Speedometer. Tap to switch display style">
+      <div class="dial" id="dial" aria-label="Speedometer">
         <canvas id="gauge" aria-hidden="true"></canvas>
         <div class="readout">
           <div class="v" id="speedNum">0</div>
@@ -218,9 +235,37 @@ ul{padding-left:20px}
           <span class="flag">Over limit</span>
         </div>
       </div>
-      <div class="picker">
-        <div class="dots" id="styleDots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
-        <div class="hint" id="styleHint">Classic · tap the dial to switch style</div>
+      <a class="mini" href="#trip" aria-label="Open trip details">
+        <span>Trip<b id="mDist">0.00 km</b></span><span>Time<b id="mTime">0:00</b></span><span>Top<b id="mTop">0</b></span>
+      </a>
+    </div>
+    <div class="dock" aria-label="Quick controls">
+      <div class="dockrow">
+        <div class="seg" role="group" aria-label="Speed source">
+          <button id="modeGps" aria-pressed="false">GPS</button>
+          <button id="modeSim" aria-pressed="true">Demo</button>
+        </div>
+        <div class="limitctl" role="group" aria-label="Speed limit">
+          <button id="limDown" aria-label="Lower speed limit">−</button>
+          <span class="sign" id="limitSign" aria-live="polite">100</span>
+          <button id="limUp" aria-label="Raise speed limit">+</button>
+        </div>
+      </div>
+      <div class="seg" role="group" aria-label="Units" id="unitSeg">
+        <button data-u="kmh" aria-pressed="true">km/h</button>
+        <button data-u="mph" aria-pressed="false">mph</button>
+        <button data-u="ms" aria-pressed="false">m/s</button>
+        <button data-u="kn" aria-pressed="false">knots</button>
+      </div>
+      <div class="seg" role="group" aria-label="Speedometer style" id="styleSeg">
+        <button data-st="classic" aria-pressed="true">Classic</button>
+        <button data-st="sport" aria-pressed="false">Sport</button>
+        <button data-st="digital" aria-pressed="false">Digital</button>
+        <button data-st="hud" aria-pressed="false">HUD</button>
+      </div>
+      <div class="dockrow">
+        <button class="dockbtn recb" id="recBtnD" aria-pressed="false"><span class="rdot"></span><span id="recBtnDT">Record trip</span></button>
+        <button class="dockbtn bell" id="soundBtn" aria-pressed="false"><svg viewBox="0 0 24 24"><path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20a2 2 0 0 0 4 0"/></svg><span id="soundBtnT">Speed alert off</span></button>
       </div>
     </div>
     <div class="sr" id="live" aria-live="polite"></div>
@@ -267,40 +312,10 @@ ul{padding-left:20px}
     <div class="settings">
       <div class="pagehead"><div><div class="eyebrow">Saved on this device</div><h1>Settings</h1></div></div>
 
-      <div class="eyebrow gh">Speed source</div>
-      <div class="group">
-        <div class="item">
-          <span class="lbl">Source<span class="sub">Use Device GPS on the road, Simulator to try the app indoors.</span></span>
-          <div class="seg" role="group" aria-label="Speed source">
-            <button id="modeSim" aria-pressed="true">Simulator</button>
-            <button id="modeGps" aria-pressed="false">Device GPS</button>
-          </div>
-        </div>
-        <p class="note" id="note">Device GPS needs an HTTPS address and location turned on. Tap Device GPS and allow location when asked.</p>
-      </div>
-
       <div class="eyebrow gh">Display</div>
       <div class="group">
         <div class="item">
-          <span class="lbl">Units</span>
-          <div class="seg" role="group" aria-label="Units" id="unitSeg">
-            <button data-u="kmh" aria-pressed="true">km/h</button>
-            <button data-u="mph" aria-pressed="false">mph</button>
-            <button data-u="ms" aria-pressed="false">m/s</button>
-            <button data-u="kn" aria-pressed="false">kn</button>
-          </div>
-        </div>
-        <div class="item">
-          <span class="lbl">Speedometer style</span>
-          <div class="seg" role="group" aria-label="Speedometer style" id="styleSeg">
-            <button data-st="classic" aria-pressed="true">Classic</button>
-            <button data-st="sport" aria-pressed="false">Sport</button>
-            <button data-st="digital" aria-pressed="false">Digital</button>
-            <button data-st="hud" aria-pressed="false">HUD</button>
-          </div>
-        </div>
-        <div class="item">
-          <span class="lbl" id="mirrorLbl">Mirror HUD<span class="sub">Flips the HUD so it reads correctly as a windshield reflection at night.</span></span>
+          <span class="lbl" id="mirrorLbl">Mirror HUD<span class="sub">Flips the HUD style so it reads correctly as a windshield reflection at night.</span></span>
           <button class="switch" id="mirrorSw" role="switch" aria-checked="false" aria-labelledby="mirrorLbl"></button>
         </div>
         <div class="item">
@@ -313,22 +328,6 @@ ul{padding-left:20px}
         </div>
       </div>
 
-      <div class="eyebrow gh">Alerts</div>
-      <div class="group">
-        <div class="item">
-          <label class="lbl" for="limit">Speed limit<span class="sub">The number turns amber at 90% and red above it.</span></label>
-          <div class="stepper">
-            <button id="limDown" aria-label="Lower limit">−</button>
-            <input id="limit" type="number" inputmode="numeric" min="5" max="300" step="5" value="100">
-            <button id="limUp" aria-label="Raise limit">+</button>
-          </div>
-        </div>
-        <div class="item">
-          <span class="lbl" id="soundLbl">Chime &amp; vibrate<span class="sub">Repeats every 1.5 s while over the limit. Vibration works on Android only.</span></span>
-          <button class="switch" id="soundSw" role="switch" aria-checked="false" aria-labelledby="soundLbl"></button>
-        </div>
-      </div>
-
       <div class="eyebrow gh">Device</div>
       <div class="group">
         <div class="item">
@@ -336,6 +335,12 @@ ul{padding-left:20px}
           <button class="switch" id="wakeSw" role="switch" aria-checked="false" aria-labelledby="wakeLbl"></button>
         </div>
       </div>
+
+      <div class="eyebrow gh">Location</div>
+      <div class="group">
+        <p class="note" id="note" style="border-top:0">Tap GPS on the Drive screen and allow location when your browser asks. Speed is most accurate outdoors with a clear view of the sky.</p>
+      </div>
+      <p class="muted" style="font-size:13px;margin:14px 4px 0">Units, style, speed limit, alerts and recording are on the Drive screen, where you use them.</p>
     </div>
   </section>
 
@@ -677,15 +682,15 @@ v += acc * dt; x += v * dt;</code></pre></li>
     $("#modeGps").setAttribute("aria-pressed", mode === "gps");
     if (mode === "sim") {
       source = new SimSource(); source.start(onFix);
-      setStatus("sim", "Simulated drive");
+      setStatus("sim", "Demo drive");
     } else {
       source = new GpsSource();
       setStatus("wait", "Waiting for GPS fix");
       source.start(onFix, (code, msg) => {
         if (code === 1) {
-          $("#note").textContent = msg + " Back on the simulator. Allow location for this site in your browser settings, then tap Device GPS again.";
+          $("#note").textContent = msg + " Allow location for this site in your browser settings, then tap GPS again.";
           useSource("sim");
-          setStatus("bad", "Location blocked · simulator");
+          setStatus("bad", "Location blocked · see Settings");
         } else setStatus("wait", msg);
       });
     }
@@ -896,6 +901,9 @@ v += acc * dt; x += v * dt;</code></pre></li>
   function updateText() {
     const U = UNITS[state.unit], t = state.trip, imp = state.unit === "mph";
     $("#speedNum").textContent = speedText();
+    $("#mDist").textContent = (t.dist * U.df).toFixed(2) + " " + U.dist;
+    $("#mTime").textContent = fmtTime(t.elapsed);
+    $("#mTop").textContent = Math.round(t.max * U.f);
     $("#tabDrive").textContent = document.body.dataset.view === "drive" ? "Drive" : speedText() + " " + U.label;
     if (rec.on) {
       const el = fmtTime((Date.now() - rec.start) / 1000);
@@ -924,8 +932,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
     document.querySelectorAll(".uLbl").forEach(e => e.textContent = U.label);
     $("#tDistU").textContent = U.dist;
     document.querySelectorAll("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.u === state.unit));
-    $("#limit").value = Math.round(state.limitMs * U.f);
-    $("#limit").step = state.unit === "ms" ? 1 : 5;
     $("#limitSign").textContent = Math.round(state.limitMs * U.f);
   }
 
@@ -965,8 +971,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
     const d = $("#dial");
     d.dataset.style = state.style;
     document.querySelectorAll("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === state.style));
-    document.querySelectorAll("#styleDots i").forEach((dot, i) => dot.classList.toggle("on", STYLES[i] === state.style));
-    $("#styleHint").textContent = STYLE_NAMES[state.style] + " · tap the dial to switch style";
     d.classList.toggle("mirror", state.style === "hud" && state.mirror);
     $("#mirrorSw").disabled = state.style !== "hud";
     setSwitch($("#mirrorSw"), state.mirror);
@@ -974,14 +978,11 @@ v += acc * dt; x += v * dt;</code></pre></li>
   }
   function setStyle(st) { state.style = st; store.set("style", st); applyStyle(); }
   document.querySelectorAll("#styleSeg button").forEach(b => b.onclick = () => setStyle(b.dataset.st));
-  const cycleStyle = () => setStyle(STYLES[(STYLES.indexOf(state.style) + 1) % STYLES.length]);
-  $("#dial").addEventListener("click", cycleStyle);
-  $("#dial").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleStyle(); } });
   $("#mirrorSw").onclick = () => { state.mirror = !state.mirror; store.set("mirror", state.mirror); applyStyle(); };
 
   // ---------- Controls ----------
   $("#modeSim").onclick = () => useSource("sim");
-  $("#modeGps").onclick = () => { $("#note").textContent = "Requesting location. Allow it when your browser asks."; useSource("gps"); };
+  $("#modeGps").onclick = () => useSource("gps");
   document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => {
     state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips();
   });
@@ -990,14 +991,16 @@ v += acc * dt; x += v * dt;</code></pre></li>
     vU = Math.min(Math.max(Number(vU) || 0, 5), U.max);
     state.limitMs = vU / U.f; store.set("limitMs", state.limitMs); applyUnit();
   }
-  $("#limit").addEventListener("change", e => setLimit(e.target.value));
-  $("#limUp").onclick = () => setLimit(Number($("#limit").value) + Number($("#limit").step));
-  $("#limDown").onclick = () => setLimit(Number($("#limit").value) - Number($("#limit").step));
+  const limStep = () => state.unit === "ms" ? 1 : 5;
+  const limNow = () => Math.round(state.limitMs * UNITS[state.unit].f);
+  $("#limUp").onclick = () => setLimit(Math.floor(limNow() / limStep()) * limStep() + limStep());
+  $("#limDown").onclick = () => setLimit(Math.ceil(limNow() / limStep()) * limStep() - limStep());
   $("#resetTrip").onclick = () => { state.trip = { dist: 0, moving: 0, elapsed: 0, max: 0 }; state.hist = []; state.launch.last = state.launch.best = null; };
-  $("#soundSw").onclick = () => {
+  $("#soundBtn").onclick = () => {
     state.sound = !state.sound;
     if (state.sound) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); beep(); } catch { state.sound = false; } }
-    setSwitch($("#soundSw"), state.sound);
+    $("#soundBtn").setAttribute("aria-pressed", state.sound);
+    $("#soundBtnT").textContent = state.sound ? "Speed alert on" : "Speed alert off";
   };
 
   // ---------- Wake lock ----------
@@ -1063,16 +1066,20 @@ v += acc * dt; x += v * dt;</code></pre></li>
       else { b.dataset.confirm = "1"; b.textContent = "Tap to confirm"; setTimeout(() => { if (b.isConnected) { delete b.dataset.confirm; b.textContent = "Delete"; } }, 3000); }
     }
   });
-  $("#recBtn").onclick = e => {
-    const btn = e.currentTarget;
+  function recUI() {
+    const btn = $("#recBtn");
+    btn.textContent = rec.on ? "Stop & save" : "Start recording";
+    btn.classList.toggle("rec", rec.on); btn.classList.toggle("primary", !rec.on); btn.setAttribute("aria-pressed", rec.on);
+    $("#recBtnD").setAttribute("aria-pressed", rec.on);
+    $("#recBtnDT").textContent = rec.on ? "Stop & save" : "Record trip";
+    $("#recPill").hidden = !rec.on;
+  }
+  function toggleRec() {
     if (!rec.on) {
       rec.on = true; rec.points = []; rec.start = Date.now(); rec.trip0 = { ...state.trip };
-      btn.textContent = "Stop & save"; btn.classList.add("rec"); btn.classList.remove("primary"); btn.setAttribute("aria-pressed", "true");
-      $("#recPill").hidden = false;
-      return;
+      recUI(); return;
     }
-    rec.on = false; $("#recPill").hidden = true;
-    btn.textContent = "Start recording"; btn.classList.remove("rec"); btn.classList.add("primary"); btn.setAttribute("aria-pressed", "false");
+    rec.on = false; recUI();
     if (rec.points.length < 2) { $("#recInfo").textContent = "Nothing to save yet. Record for a few seconds while moving."; return; }
     let pts = rec.points; const step = Math.ceil(pts.length / 1500); if (step > 1) pts = pts.filter((_, i) => i % step === 0);
     const tr = { id: rec.start, start: rec.start, dur: (Date.now() - rec.start) / 1000, dist: state.trip.dist - rec.trip0.dist,
@@ -1081,8 +1088,11 @@ v += acc * dt; x += v * dt;</code></pre></li>
     store.set("trips", trips);
     const saved = loadTrips().some(t => t.id === tr.id);
     $("#recInfo").textContent = saved ? "Trip saved. Export it as GPX or CSV below." : "Couldn't save: this browser's storage is full or blocked. Delete an old trip and try again.";
+    $("#recBtnDT").textContent = saved ? "Saved · Record again" : "Save failed · see Trip";
     renderTrips();
-  };
+  }
+  $("#recBtn").onclick = toggleRec;
+  $("#recBtnD").onclick = toggleRec;
   $("#recPill").addEventListener("click", () => { location.hash = "#trip"; });
 
   // ---------- Theme ----------
