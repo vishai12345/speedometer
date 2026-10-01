@@ -4,12 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#0c1117">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>Pacer Speedometer</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&family=Saira+Condensed:wght@500;600;700&display=swap">
 <style>
-/* Layout: instrument cluster (dial + trip computer) on top, engineering notes below in a single reading column with a section index. */
+/* Layout: app shell. Drive = speedometer only (primary zone). Trip / Settings / About are secondary screens behind a bottom tab bar (floating pill on wide screens). */
 :root{
   --bg:#eceff2; --panel:#ffffff; --sunk:#f4f6f8; --ink:#141c25; --muted:#5a6672; --line:#d3d9e0;
   --accent:#b86a00; --accent-soft:rgba(184,106,0,.14); --alert:#cf3434; --alert-soft:rgba(207,52,52,.14); --ok:#1d7f54;
@@ -17,7 +19,7 @@
   --f-display:"Saira Condensed","Arial Narrow",system-ui,sans-serif;
   --f-body:"IBM Plex Sans",system-ui,-apple-system,"Segoe UI",sans-serif;
   --f-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --r:12px;
+  --r:12px; --tabh:62px;
 }
 @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
   --bg:#0c1117; --panel:#141b23; --sunk:#10161d; --ink:#e6ebf0; --muted:#8b98a6; --line:#25303c;
@@ -29,111 +31,151 @@
   --needle:#ff5b52; --face:#0f151c; color-scheme:dark}
 
 *{box-sizing:border-box}
-html,body{margin:0}
-body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased}
-.wrap{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:20px 64px}
+html,body{margin:0;min-height:100%}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;transition:background-color .3s,color .3s}
+[hidden]{display:none!important}
 h1,h2,h3{font-family:var(--f-display);font-weight:600;letter-spacing:.01em;line-height:1.1;text-wrap:balance;margin:0}
-h1{font-size:30px}
-h2{font-size:28px;margin-bottom:12px}
-h3{font-size:19px;margin:22px 0 6px}
 p{margin:0 0 12px}
 a{color:var(--accent)}
 code{font-family:var(--f-mono);font-size:.86em;background:var(--sunk);border:1px solid var(--line);border-radius:5px;padding:1px 5px}
-.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
-.muted{color:var(--muted)}
 button,input{font:inherit;color:inherit}
 :focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}
+.muted{color:var(--muted)}
+.sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+@keyframes pulse{50%{opacity:.25}}
 
-/* header */
-.top{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:16px}
-.top p{margin:4px 0 0;color:var(--muted);max-width:60ch}
-.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel)}
-.dot{width:8px;height:8px;border-radius:50%;background:var(--muted)}
+/* ---------- shell ---------- */
+.app{padding-bottom:calc(var(--tabh) + env(safe-area-inset-bottom,0px))}
+.view{max-width:1080px;margin:0 auto;padding-inline:16px;padding-block:calc(env(safe-area-inset-top,0px) + 20px) 28px}
+.pagehead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:12px;margin-bottom:18px}
+.pagehead h1{font-size:34px}
+.pagehead p{margin:4px 0 0;color:var(--muted);max-width:60ch}
+
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:20;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));background:var(--panel);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs a{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;height:var(--tabh);color:var(--muted);text-decoration:none;font-size:11px;font-weight:500;position:relative;transition:color .15s}
+.tabs svg{width:22px;height:22px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.tabs a[aria-current="page"]{color:var(--ink)}
+.tabs a[aria-current="page"] svg{stroke:var(--accent)}
+.tabs a[aria-current="page"]::before{content:"";position:absolute;top:0;left:30%;right:30%;height:2px;border-radius:0 0 2px 2px;background:var(--accent)}
+.tabs .live{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.over .tabs a[data-to="drive"]{color:var(--alert)}
+.over .tabs a[data-to="drive"] svg{stroke:var(--alert)}
+@media (min-width:820px){
+  .app{padding-bottom:96px}
+  .tabs{left:50%;right:auto;bottom:18px;transform:translateX(-50%);width:460px;border:1px solid var(--line);border-radius:16px;box-shadow:0 10px 30px rgba(0,0,0,.14);overflow:hidden;padding-bottom:0}
+  .tabs a{flex-direction:row;gap:8px;height:52px;font-size:13px}
+  .tabs a[aria-current="page"]::before{top:auto;bottom:0;border-radius:2px 2px 0 0}
+}
+
+/* ---------- drive ---------- */
+.drive{display:flex;flex-direction:column;align-items:center;min-height:calc(100dvh - var(--tabh) - env(safe-area-inset-bottom,0px));padding-block:calc(env(safe-area-inset-top,0px) + 12px) 12px}
+@media (min-width:820px){.drive{min-height:calc(100dvh - 96px)}}
+.drivebar{width:100%;max-width:560px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.drivebar .right{display:flex;align-items:center;gap:10px}
+.status{display:inline-flex;align-items:center;gap:8px;font-family:var(--f-mono);font-size:12px;padding:6px 10px;border:1px solid var(--line);border-radius:999px;background:var(--panel);min-width:0;max-width:62vw;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
 .status[data-s="ok"] .dot{background:var(--ok)}
 .status[data-s="sim"] .dot{background:var(--accent)}
 .status[data-s="bad"] .dot{background:var(--alert)}
-.status[data-s="wait"] .dot{background:var(--muted);animation:pulse 1.2s infinite}
-@keyframes pulse{50%{opacity:.25}}
-
-/* cluster */
-.cluster{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(0,1fr);gap:16px;align-items:start}
-@media (max-width:820px){.cluster{grid-template-columns:minmax(0,1fr)}}
-.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px}
-.dialbox{display:flex;flex-direction:column;align-items:center;gap:14px}
-.dial{position:relative;width:100%;max-width:440px;aspect-ratio:1;max-height:440px}
+.status[data-s="wait"] .dot{animation:pulse 1.2s infinite}
+.recpill{display:inline-flex;align-items:center;gap:6px;font-family:var(--f-mono);font-size:12px;color:var(--alert);font-variant-numeric:tabular-nums}
+.recpill .dot{background:var(--alert);animation:pulse 1.2s infinite}
+.sign{width:44px;height:44px;border-radius:50%;border:4px solid var(--alert);background:var(--panel);display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:15px;letter-spacing:-.02em;line-height:1;color:var(--ink);text-decoration:none;flex:none}
+.iconbtn{width:40px;height:40px;border-radius:10px;border:1px solid var(--line);background:var(--panel);display:grid;place-items:center;cursor:pointer;flex:none}
+.iconbtn svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+.stage{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;width:100%}
+.dial{position:relative;width:min(100%,64dvh,560px);aspect-ratio:1;container-type:inline-size;cursor:pointer;-webkit-tap-highlight-color:transparent;border-radius:50%}
 .dial canvas{position:absolute;inset:0;width:100%;height:100%}
-.readout{position:absolute;left:0;right:0;top:56%;text-align:center;pointer-events:none}
-.readout .v{font-family:var(--f-display);font-weight:700;font-size:clamp(56px,17vw,88px);line-height:.9;font-variant-numeric:tabular-nums;transition:color .2s}
-.readout .u{font-family:var(--f-mono);font-size:12px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
-.over .readout .v{color:var(--alert)}
-.flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
+.readout{position:absolute;left:0;right:0;top:55%;text-align:center;pointer-events:none}
+.readout .v{font-family:var(--f-display);font-weight:700;font-size:21cqw;line-height:.9;font-variant-numeric:tabular-nums;transition:color .2s}
+.readout .u{font-family:var(--f-mono);font-size:max(11px,2.8cqw);letter-spacing:.14em;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.flag{display:inline-block;margin-top:8px;font-family:var(--f-mono);font-size:max(10px,2.5cqw);letter-spacing:.1em;text-transform:uppercase;padding:3px 8px;border-radius:4px;background:var(--alert);color:var(--panel);visibility:hidden}
 .over .flag{visibility:visible;animation:pulse .9s infinite}
 .warn .readout .v{color:var(--accent)}
-body{transition:background-color .3s,color .3s}
-.btn,.seg button{transition:background-color .15s,color .15s,box-shadow .15s,border-color .15s}
-.strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;width:100%;max-width:440px}
-@media (max-width:480px){.strip{grid-template-columns:repeat(2,minmax(0,1fr))}}
-.chip{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:8px 10px;min-width:0}
+.over .readout .v{color:var(--alert)}
+.dial[data-style="sport"] .readout{top:38%}
+.dial[data-style="digital"]{border-radius:14px}
+.dial[data-style="digital"] .readout{top:9%}
+.dial[data-style="digital"] .readout .v{font-size:38cqw}
+.dial[data-style="hud"]{background:#000;border-radius:14px}
+.dial[data-style="hud"] .readout{top:13%}
+.dial[data-style="hud"] .readout .v{font-size:43cqw;color:#7dffb0;text-shadow:0 0 18px rgba(125,255,176,.45)}
+.dial[data-style="hud"] .readout .u{color:#7dffb0;opacity:.8}
+.over .dial[data-style="hud"] .readout .v{color:#ff5b52;text-shadow:0 0 18px rgba(255,91,82,.5)}
+.dial.mirror{transform:scaleX(-1)}
+.picker{display:flex;flex-direction:column;align-items:center;gap:6px}
+.dots{display:flex;gap:6px;align-items:center}
+.dots i{width:6px;height:6px;border-radius:3px;background:var(--line);transition:width .25s,background-color .25s}
+.dots i.on{width:18px;background:var(--accent)}
+.picker .hint{font-size:12px;color:var(--muted)}
+body.drive .tabs{display:none}
+body.drive .app{padding-bottom:0}
+body.drive .drive{min-height:100dvh}
+body[data-view="drive"].hudbg{background:#000}
+body[data-view="drive"].hudbg .picker .hint{color:#7dffb0;opacity:.7}
+
+/* ---------- shared panels ---------- */
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:18px;min-width:0}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px;align-items:start}
+@media (max-width:820px){.grid2{grid-template-columns:minmax(0,1fr)}}
+.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:8px 13px;cursor:pointer;font-size:13px;font-weight:500;transition:background-color .15s,border-color .15s,color .15s}
+.btn:hover{border-color:var(--muted)}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
+.btn.rec{background:var(--alert);border-color:var(--alert);color:var(--panel)}
+.btn.sm{padding:4px 9px;font-size:12px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk);max-width:100%}
+.seg button{border:0;background:transparent;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted);transition:background-color .15s,color .15s,box-shadow .15s}
+.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+
+/* ---------- trip ---------- */
+.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
+.stat{background:var(--panel);padding:12px 14px}
+.stat .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
+.stat .n{font-family:var(--f-display);font-size:32px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
+.stat .n small{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
+.chips{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.chip{background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:9px 11px;min-width:0}
 .chip .k{display:block;font-family:var(--f-mono);font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.chip .n{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
+.chip .n{display:flex;align-items:center;gap:6px;font-family:var(--f-display);font-size:23px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.2;white-space:nowrap}
 .arw{width:12px;height:12px;fill:var(--accent);transition:transform .4s ease;flex:none}
+.spark{width:100%;height:96px;display:block}
 .trips{list-style:none;padding:0;margin:0}
 .trips li{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;border-top:1px solid var(--line);padding:10px 0}
 .trips li > div:first-child{min-width:0}
 .trips strong{display:block;font-size:14px}
 .trips span{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
 .acts{display:flex;gap:6px}
-.btn.sm{padding:4px 9px;font-size:12px}
-.btn.rec{background:var(--alert);border-color:var(--alert);color:var(--panel)}
-/* display styles */
-.dial[data-style="sport"] .readout{top:38%}
-.dial[data-style="digital"] .readout{top:10%}
-.dial[data-style="digital"] .readout .v{font-size:clamp(96px,30vw,168px)}
-.dial[data-style="hud"]{background:#000;border-radius:14px}
-.dial[data-style="hud"] .readout{top:14%}
-.dial[data-style="hud"] .readout .v{font-size:clamp(110px,34vw,190px);color:#7dffb0;text-shadow:0 0 18px rgba(125,255,176,.45)}
-.dial[data-style="hud"] .readout .u{color:#7dffb0;opacity:.8}
-.over .dial[data-style="hud"] .readout .v{color:#ff5b52;text-shadow:0 0 18px rgba(255,91,82,.5)}
-.dial.mirror{transform:scaleX(-1)}
-/* drive mode: dial only, fills the screen */
-body.drive .top, body.drive .side, body.drive .docs{display:none}
-body.drive .cluster{grid-template-columns:minmax(0,1fr)}
-body.drive .wrap{padding-block:8px}
-body.drive .dialbox{min-height:calc(100dvh - 24px);justify-content:center;border:0;background:var(--bg)}
-body.drive .dial{max-width:min(94vw,70dvh);max-height:none}
-body.drive.hudbg, body.drive.hudbg .dialbox{background:#000}
+.sectionhead{display:flex;justify-content:space-between;align-items:center;gap:10px;margin-bottom:12px}
 
-.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:var(--sunk)}
-.seg button{border:0;background:transparent;padding:7px 14px;cursor:pointer;font-size:13px;font-weight:500;color:var(--muted)}
-.seg button[aria-pressed="true"]{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
-.row{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+/* ---------- settings ---------- */
+.settings{max-width:640px}
+.gh{margin:22px 4px 8px}
+.gh:first-of-type{margin-top:0}
+.group{background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+.item{display:flex;flex-wrap:wrap;align-items:center;justify-content:space-between;gap:10px 16px;padding:13px 14px;border-top:1px solid var(--line)}
+.item:first-child{border-top:0}
+.item .lbl{font-weight:500;min-width:0;flex:1 1 200px}
+.item .sub{display:block;font-size:12px;color:var(--muted);font-weight:400;max-width:42ch}
+.switch{position:relative;width:48px;height:28px;border-radius:14px;border:0;background:var(--line);cursor:pointer;flex:none;transition:background-color .2s}
+.switch::after{content:"";position:absolute;top:3px;left:3px;width:22px;height:22px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s}
+.switch[aria-checked="true"]{background:var(--ok)}
+.switch[aria-checked="true"]::after{transform:translateX(20px)}
+.switch:disabled{opacity:.4;cursor:not-allowed}
+.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.stepper button{border:0;background:var(--sunk);width:38px;height:36px;cursor:pointer;font-size:17px}
+.stepper input{width:64px;height:36px;border:0;border-inline:1px solid var(--line);background:var(--panel);text-align:center;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+.note{font-size:13px;color:var(--muted);background:var(--sunk);border-top:1px solid var(--line);padding:11px 14px;margin:0}
 
-.side{display:flex;flex-direction:column;gap:16px}
-.stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:10px;overflow:hidden}
-.stat{background:var(--panel);padding:12px 14px}
-.stat .k{font-family:var(--f-mono);font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted)}
-.stat .n{font-family:var(--f-display);font-size:30px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.15}
-.stat .n small{font-family:var(--f-mono);font-size:11px;color:var(--muted);margin-left:4px;font-weight:400}
-.spark{width:100%;height:84px;display:block}
-.ctl{display:grid;grid-template-columns:auto 1fr;gap:10px 14px;align-items:center}
-.ctl label{font-size:13px;color:var(--muted)}
-.stepper{display:inline-flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;width:max-content}
-.stepper button{border:0;background:var(--sunk);width:36px;height:34px;cursor:pointer;font-size:17px}
-.stepper input{width:64px;height:34px;border:0;border-inline:1px solid var(--line);background:var(--panel);text-align:center;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
-.btn{border:1px solid var(--line);background:var(--panel);border-radius:8px;padding:7px 12px;cursor:pointer;font-size:13px;font-weight:500}
-.btn:hover{border-color:var(--muted)}
-.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--panel)}
-.btn[aria-pressed="true"]{border-color:var(--accent);box-shadow:inset 0 0 0 1px var(--accent)}
-.note{font-size:13px;color:var(--muted);background:var(--sunk);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin:0}
-
-/* docs */
-.docs{display:grid;grid-template-columns:200px minmax(0,1fr);gap:40px;margin-top:48px}
-@media (max-width:820px){.docs{grid-template-columns:minmax(0,1fr);gap:16px}}
-.toc{position:sticky;top:calc(env(safe-area-inset-top,0px) + 16px);align-self:start;display:flex;flex-direction:column;gap:2px}
-@media (max-width:820px){.toc{position:static;flex-direction:row;flex-wrap:wrap;gap:6px}}
-.toc a{font-size:13px;color:var(--muted);text-decoration:none;padding:4px 8px;border-radius:6px}
-.toc a:hover{color:var(--ink);background:var(--panel)}
-.docs section{max-width:72ch;margin-bottom:44px;min-width:0}
+/* ---------- about ---------- */
+.about{max-width:760px}
+.jump{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:26px}
+.jump button{border:1px solid var(--line);background:var(--panel);border-radius:999px;padding:5px 12px;font-size:13px;cursor:pointer;color:var(--muted)}
+.jump button:hover{color:var(--ink)}
+.about section{margin-bottom:44px;min-width:0;scroll-margin-top:16px}
+.about h2{font-size:28px;margin-bottom:12px}
+.about h3{font-size:19px;margin:22px 0 6px}
 .tbl{overflow-x:auto;border:1px solid var(--line);border-radius:10px;margin:12px 0}
 table{border-collapse:collapse;width:100%;min-width:560px;font-size:14px}
 th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
@@ -152,22 +194,23 @@ ul{padding-left:20px}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 </style>
 </head>
-<body>
+<body data-view="drive">
+<div class="app" id="app">
 
-
-<div class="wrap" id="app">
-  <header class="top">
-    <div>
-      <div class="eyebrow">Web instrument · v1.2</div>
-      <h1>Pacer Speedometer</h1>
-      <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and an overspeed alert. Opens on a simulated drive so you can see it working right away.</p>
+  <!-- ===================== DRIVE ===================== -->
+  <section class="view drive" data-view="drive" aria-label="Speedometer">
+    <div class="drivebar">
+      <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Simulated drive</span></div>
+      <div class="right">
+        <span class="recpill" id="recPill" hidden><span class="dot"></span><span id="recPillT">REC 0:00</span></span>
+        <a class="sign" id="limitSign" href="#settings" aria-label="Speed limit, tap to change">100</a>
+        <button class="iconbtn" id="fsBtn" aria-pressed="false" aria-label="Drive mode: full screen, screen stays on">
+          <svg viewBox="0 0 24 24" id="fsIcon"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg>
+        </button>
+      </div>
     </div>
-    <div class="status" id="status" data-s="sim" role="status"><span class="dot"></span><span id="statusText">Simulated drive</span></div>
-  </header>
-
-  <div class="cluster">
-    <div class="panel dialbox" id="dialPanel">
-      <div class="dial">
+    <div class="stage">
+      <div class="dial" id="dial" role="button" tabindex="0" aria-label="Speedometer. Tap to switch display style">
         <canvas id="gauge" aria-hidden="true"></canvas>
         <div class="readout">
           <div class="v" id="speedNum">0</div>
@@ -175,100 +218,138 @@ ul{padding-left:20px}
           <span class="flag">Over limit</span>
         </div>
       </div>
-      <div class="strip">
-        <div class="chip"><span class="k">Heading</span><span class="n"><svg class="arw" id="arw" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0L9 10L5 7.6L1 10z"/></svg><span id="iHdg">—</span></span></div>
-        <div class="chip"><span class="k">Altitude</span><span class="n" id="iAlt">—</span></div>
-        <div class="chip"><span class="k">Accel</span><span class="n" id="iG">0.00 g</span></div>
-        <div class="chip"><span class="k" id="iLaunchK">0–100 km/h</span><span class="n" id="iLaunch">—</span></div>
-      </div>
-      <div class="sr" id="live" aria-live="polite" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)"></div>
-      <div class="row" style="justify-content:center">
-        <div class="seg" role="group" aria-label="Speed source">
-          <button id="modeSim" aria-pressed="true">Simulator</button>
-          <button id="modeGps" aria-pressed="false">Device GPS</button>
-        </div>
-        <div class="seg" role="group" aria-label="Units" id="unitSeg">
-          <button data-u="kmh" aria-pressed="true">km/h</button>
-          <button data-u="mph" aria-pressed="false">mph</button>
-          <button data-u="ms" aria-pressed="false">m/s</button>
-          <button data-u="kn" aria-pressed="false">kn</button>
-        </div>
-      </div>
-      <div class="row" style="justify-content:center">
-        <div class="seg" role="group" aria-label="Display style" id="styleSeg">
-          <button data-st="classic" aria-pressed="true">Classic</button>
-          <button data-st="sport" aria-pressed="false">Sport</button>
-          <button data-st="digital" aria-pressed="false">Digital</button>
-          <button data-st="hud" aria-pressed="false">HUD</button>
-        </div>
-        <button class="btn" id="mirrorBtn" aria-pressed="false" hidden>Mirror for windshield</button>
-        <button class="btn" id="driveBtn" aria-pressed="false">Drive mode</button>
+      <div class="picker">
+        <div class="dots" id="styleDots" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+        <div class="hint" id="styleHint">Classic · tap the dial to switch style</div>
       </div>
     </div>
+    <div class="sr" id="live" aria-live="polite"></div>
+  </section>
 
-    <div class="side">
-      <div class="panel">
-        <div class="row" style="justify-content:space-between;margin-bottom:12px">
-          <div class="eyebrow">Trip computer</div>
-          <button class="btn" id="resetTrip">Reset trip</button>
-        </div>
+  <!-- ===================== TRIP ===================== -->
+  <section class="view" data-view="trip" hidden aria-label="Trip">
+    <div class="pagehead">
+      <div><div class="eyebrow">Live while you drive</div><h1>Trip</h1></div>
+      <button class="btn" id="resetTrip">Reset trip</button>
+    </div>
+    <div class="grid2">
+      <div style="display:flex;flex-direction:column;gap:16px;min-width:0">
         <div class="stats">
           <div class="stat"><div class="k">Distance</div><div class="n"><span id="tDist">0.00</span><small id="tDistU">km</small></div></div>
           <div class="stat"><div class="k">Elapsed</div><div class="n"><span id="tTime">0:00</span></div></div>
           <div class="stat"><div class="k">Average (moving)</div><div class="n"><span id="tAvg">0</span><small class="uLbl">km/h</small></div></div>
           <div class="stat"><div class="k">Top speed</div><div class="n"><span id="tMax">0</span><small class="uLbl">km/h</small></div></div>
         </div>
-        <div style="margin-top:14px">
-          <div class="row" style="justify-content:space-between"><div class="eyebrow">Last 60 seconds</div><div class="eyebrow" id="accText">±– m</div></div>
+        <div class="chips">
+          <div class="chip"><span class="k">Heading</span><span class="n"><svg class="arw" id="arw" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 0L9 10L5 7.6L1 10z"/></svg><span id="iHdg">—</span></span></div>
+          <div class="chip"><span class="k">Altitude</span><span class="n" id="iAlt">—</span></div>
+          <div class="chip"><span class="k">Accel</span><span class="n" id="iG">0.00 g</span></div>
+          <div class="chip"><span class="k" id="iLaunchK">0–100 km/h</span><span class="n" id="iLaunch">—</span></div>
+        </div>
+        <div class="panel">
+          <div class="sectionhead"><div class="eyebrow">Speed · last 60 seconds</div><div class="eyebrow" id="accText">±– m</div></div>
           <canvas class="spark" id="spark" aria-label="Speed over the last 60 seconds"></canvas>
         </div>
       </div>
-
       <div class="panel">
-        <div class="row" style="justify-content:space-between;margin-bottom:10px">
+        <div class="sectionhead">
           <div class="eyebrow">Trip log</div>
           <button class="btn primary" id="recBtn" aria-pressed="false">Start recording</button>
         </div>
         <p class="muted" id="recInfo" style="font-size:13px;margin:0 0 6px">Record a drive to save its route and stats on this phone, then export it as GPX for maps or CSV for spreadsheets.</p>
         <ul class="trips" id="trips"></ul>
       </div>
+    </div>
+  </section>
 
-      <div class="panel">
-        <div class="eyebrow" style="margin-bottom:12px">Alerts &amp; device</div>
-        <div class="ctl">
-          <label for="limit">Speed limit</label>
-          <div class="stepper">
-            <button id="limDown" aria-label="Lower limit">−</button>
-            <input id="limit" type="number" inputmode="numeric" min="5" max="300" step="5" value="100">
-            <button id="limUp" aria-label="Raise limit">+</button>
+  <!-- ===================== SETTINGS ===================== -->
+  <section class="view" data-view="settings" hidden aria-label="Settings">
+    <div class="settings">
+      <div class="pagehead"><div><div class="eyebrow">Saved on this device</div><h1>Settings</h1></div></div>
+
+      <div class="eyebrow gh">Speed source</div>
+      <div class="group">
+        <div class="item">
+          <span class="lbl">Source<span class="sub">Use Device GPS on the road, Simulator to try the app indoors.</span></span>
+          <div class="seg" role="group" aria-label="Speed source">
+            <button id="modeSim" aria-pressed="true">Simulator</button>
+            <button id="modeGps" aria-pressed="false">Device GPS</button>
           </div>
-          <label for="soundBtn">Chime</label>
-          <div><button class="btn" id="soundBtn" aria-pressed="false">Chime &amp; vibrate over limit</button></div>
-          <label>Theme</label>
+        </div>
+        <p class="note" id="note">Device GPS needs an HTTPS address and location turned on. Tap Device GPS and allow location when asked.</p>
+      </div>
+
+      <div class="eyebrow gh">Display</div>
+      <div class="group">
+        <div class="item">
+          <span class="lbl">Units</span>
+          <div class="seg" role="group" aria-label="Units" id="unitSeg">
+            <button data-u="kmh" aria-pressed="true">km/h</button>
+            <button data-u="mph" aria-pressed="false">mph</button>
+            <button data-u="ms" aria-pressed="false">m/s</button>
+            <button data-u="kn" aria-pressed="false">kn</button>
+          </div>
+        </div>
+        <div class="item">
+          <span class="lbl">Speedometer style</span>
+          <div class="seg" role="group" aria-label="Speedometer style" id="styleSeg">
+            <button data-st="classic" aria-pressed="true">Classic</button>
+            <button data-st="sport" aria-pressed="false">Sport</button>
+            <button data-st="digital" aria-pressed="false">Digital</button>
+            <button data-st="hud" aria-pressed="false">HUD</button>
+          </div>
+        </div>
+        <div class="item">
+          <span class="lbl" id="mirrorLbl">Mirror HUD<span class="sub">Flips the HUD so it reads correctly as a windshield reflection at night.</span></span>
+          <button class="switch" id="mirrorSw" role="switch" aria-checked="false" aria-labelledby="mirrorLbl"></button>
+        </div>
+        <div class="item">
+          <span class="lbl">Theme</span>
           <div class="seg" role="group" aria-label="Theme" id="themeSeg">
             <button data-th="auto" aria-pressed="true">Auto</button>
             <button data-th="light" aria-pressed="false">Day</button>
             <button data-th="dark" aria-pressed="false">Night</button>
           </div>
-          <label for="wakeBtn">Screen</label>
-          <div><button class="btn" id="wakeBtn" aria-pressed="false">Keep screen on</button></div>
         </div>
-        <p class="note" id="note" style="margin-top:14px">Device GPS needs this file hosted on an HTTPS site and a phone with location on. Tap Device GPS to start.</p>
+      </div>
+
+      <div class="eyebrow gh">Alerts</div>
+      <div class="group">
+        <div class="item">
+          <label class="lbl" for="limit">Speed limit<span class="sub">The number turns amber at 90% and red above it.</span></label>
+          <div class="stepper">
+            <button id="limDown" aria-label="Lower limit">−</button>
+            <input id="limit" type="number" inputmode="numeric" min="5" max="300" step="5" value="100">
+            <button id="limUp" aria-label="Raise limit">+</button>
+          </div>
+        </div>
+        <div class="item">
+          <span class="lbl" id="soundLbl">Chime &amp; vibrate<span class="sub">Repeats every 1.5 s while over the limit. Vibration works on Android only.</span></span>
+          <button class="switch" id="soundSw" role="switch" aria-checked="false" aria-labelledby="soundLbl"></button>
+        </div>
+      </div>
+
+      <div class="eyebrow gh">Device</div>
+      <div class="group">
+        <div class="item">
+          <span class="lbl" id="wakeLbl">Keep screen on<span class="sub" id="wakeSub">Stops the phone dimming. Drive mode turns this on for you.</span></span>
+          <button class="switch" id="wakeSw" role="switch" aria-checked="false" aria-labelledby="wakeLbl"></button>
+        </div>
       </div>
     </div>
-  </div>
+  </section>
 
-  <div class="docs">
-    <nav class="toc" aria-label="Sections">
-      <span class="eyebrow" style="padding:4px 8px">Engineering notes</span>
-      <a href="#components">Components</a>
-      <a href="#design">Design</a>
-      <a href="#principle">Working principle</a>
-      <a href="#build">Implementation</a>
-      <a href="#deploy">Deploy</a>
-    </nav>
-    <div style="min-width:0">
-
+  <!-- ===================== ABOUT ===================== -->
+  <section class="view about" data-view="about" hidden aria-label="About">
+    <div class="pagehead"><div><div class="eyebrow">Engineering notes · v2.0</div><h1>How Pacer works</h1>
+      <p>Live GPS speed with Kalman filtering, a 60 fps dial, a trip computer and overspeed alerts, in one HTML file with no backend. Location never leaves your phone.</p></div></div>
+    <div class="jump">
+      <button data-scroll="components">Components</button>
+      <button data-scroll="design">Design</button>
+      <button data-scroll="principle">Working principle</button>
+      <button data-scroll="build">Implementation</button>
+      <button data-scroll="deploy">Deploy</button>
+    </div>
 <section id="components">
   <h2>Components</h2>
   <p>The app is split into small units with one job each. Sources produce raw fixes, the estimator turns them into one trusted speed, and everything on screen reads from a single state object.</p>
@@ -283,6 +364,7 @@ ul{padding-left:20px}
       <tr><td>Trip computer</td><td>Integrates distance, moving time, average and top speed</td><td>—</td></tr>
       <tr><td>Alert engine</td><td>Compares speed to the limit; drives the red state and the chime</td><td>Web Audio</td></tr>
       <tr><td>Display styles</td><td>Classic needle dial, Sport LED arc, large Digital readout and a mirrored windshield HUD, all fed by the same state</td><td>Canvas 2D</td></tr>
+      <tr><td>App shell</td><td>Drive, Trip, Settings and About screens behind a bottom tab bar; hash links keep each screen addressable while sensors keep running</td><td><code>hashchange</code></td></tr>
       <tr><td>Drive mode</td><td>Hides everything except the dial, goes full screen and keeps the screen on</td><td>Fullscreen, Screen Wake Lock</td></tr>
       <tr><td>Heading &amp; altitude</td><td>Compass heading from GPS course (or bearing between fixes) and altitude above sea level</td><td><code>coords.heading</code>, <code>coords.altitude</code></td></tr>
       <tr><td>G meter &amp; 0–100 timer</td><td>Longitudinal acceleration from the filtered speed; automatic launch timer from standstill to 100 km/h (60 mph)</td><td>—</td></tr>
@@ -322,6 +404,8 @@ ul{padding-left:20px}
     </svg>
   </div>
   <ul>
+    <li><strong>One job per screen.</strong> Drive shows only speed, the limit sign and recording state, so a glance takes well under a second. Trip data, settings and these notes sit one tap away in the tab bar, which stays within thumb reach.</li>
+    <li><strong>One page, many screens.</strong> Screens swap inside a single page instead of loading new files, so GPS, the filter, the trip computer and recording never restart when you switch tabs.</li>
     <li><strong>SI units inside.</strong> All maths runs in metres and seconds. Units are converted only at display time, so switching km/h ↔ mph never corrupts trip data.</li>
     <li><strong>One state object.</strong> Sources write to it, the render loop reads from it. No component talks to another directly, so sources are swappable (GPS, simulator, or an OBD-II adapter later).</li>
     <li><strong>Canvas for the dial, DOM for text.</strong> The dial redraws every frame on a <code>devicePixelRatio</code>-scaled canvas; numbers stay as real text so they are crisp, selectable and readable by screen readers.</li>
@@ -410,8 +494,14 @@ v += acc * dt; x += v * dt;</code></pre></li>
     <li>GPS speed lags reality by roughly 0.5–1 s. Treat this as a driver aid, not a calibrated instrument.</li>
   </ul>
 </section>
-    </div>
-  </div>
+  </section>
+
+  <nav class="tabs" aria-label="Main">
+    <a href="#drive" data-to="drive" aria-current="page"><svg viewBox="0 0 24 24"><path d="M4.5 17a8.5 8.5 0 1 1 15 0"/><path d="M12 13.5l4-5"/><circle cx="12" cy="14" r="1.2"/></svg><span class="live" id="tabDrive">Drive</span></a>
+    <a href="#trip" data-to="trip"><svg viewBox="0 0 24 24"><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/><path d="M8 18h7a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h7"/></svg><span>Trip</span></a>
+    <a href="#settings" data-to="settings"><svg viewBox="0 0 24 24"><path d="M4 7h10M18 7h2M4 17h4M12 17h8"/><circle cx="16" cy="7" r="2"/><circle cx="10" cy="17" r="2"/></svg><span>Settings</span></a>
+    <a href="#about" data-to="about"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v6M12 7.5v.5"/></svg><span>About</span></a>
+  </nav>
 </div>
 
 <script>
@@ -423,26 +513,29 @@ v += acc * dt; x += v * dt;</code></pre></li>
 
   // ---------- Units (internal SI: m/s, m) ----------
   const UNITS = {
-    kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km", df: 0.001 },
-    mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi", df: 0.000621371 },
-    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km", df: 0.001 },
+    kmh: { label: "km/h", f: 3.6,      max: 240, major: 20, minor: 5,   dist: "km",  df: 0.001 },
+    mph: { label: "mph",  f: 2.236936, max: 160, major: 20, minor: 5,   dist: "mi",  df: 0.000621371 },
+    ms:  { label: "m/s",  f: 1,        max: 70,  major: 10, minor: 2.5, dist: "km",  df: 0.001 },
     kn:  { label: "kn",   f: 1.943844, max: 140, major: 20, minor: 5,   dist: "nmi", df: 0.000539957 }
   };
+  const STYLES = ["classic", "sport", "digital", "hud"];
+  const STYLE_NAMES = { classic: "Classic", sport: "Sport", digital: "Digital", hud: "HUD" };
 
   // ---------- Settings store ----------
   const store = {
     get(k, d) { try { const v = localStorage.getItem("pacer." + k); return v === null ? d : JSON.parse(v); } catch { return d; } },
     set(k, v) { try { localStorage.setItem("pacer." + k, JSON.stringify(v)); } catch {} }
   };
+  const pick = (k, d, ok) => { const v = store.get(k, d); return ok(v) ? v : d; };
 
   // ---------- State ----------
   const state = {
-    unit: UNITS[store.get("unit", "kmh")] ? store.get("unit", "kmh") : "kmh",
-    limitMs: store.get("limitMs", 100 / 3.6),
+    unit: pick("unit", "kmh", v => !!UNITS[v]),
+    limitMs: pick("limitMs", 100 / 3.6, v => typeof v === "number" && v > 0),
+    style: pick("style", "classic", v => STYLES.includes(v)),
+    mirror: store.get("mirror", false) === true,
     mode: "sim",
-    style: ["classic", "sport", "digital", "hud"].includes(store.get("style", "classic")) ? store.get("style", "classic") : "classic",
-    est: 0, shown: 0, vel: 0,
-    lastRecv: 0, acc: null,
+    est: 0, shown: 0, vel: 0, lastRecv: 0, acc: null,
     trip: { dist: 0, moving: 0, elapsed: 0, max: 0 },
     hist: [], sound: false,
     hdg: null, alt: null, accel: 0, lastEst: 0, lastEstT: 0,
@@ -472,7 +565,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
     const h = Math.sin(dφ / 2) ** 2 + Math.cos(toRad(a.lat)) * Math.cos(toRad(b.lat)) * Math.sin(dλ / 2) ** 2;
     return 2 * R * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   }
-
   function bearing(a, b) {
     const φ1 = toRad(a.lat), φ2 = toRad(b.lat), dλ = toRad(b.lon - a.lon);
     const y = Math.sin(dλ) * Math.cos(φ2), x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dλ);
@@ -480,7 +572,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
   }
   const compass = h => ["N", "NE", "E", "SE", "S", "SW", "W", "NW"][Math.round(h / 45) % 8];
 
-  // Trip recorder
+  // ---------- Trip recorder + derived metrics ----------
   const rec = { on: false, points: [], start: 0, trip0: null };
   function afterEstimate(f) {
     const dt = state.lastEstT ? (f.t - state.lastEstT) / 1000 : 0;
@@ -533,7 +625,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
           p => onFix({ t: p.timestamp, lat: p.coords.latitude, lon: p.coords.longitude, acc: p.coords.accuracy, speed: p.coords.speed, heading: p.coords.heading, alt: p.coords.altitude }),
           e => onErr(e.code, e.code === 1 ? "Location permission was refused." : e.code === 3 ? "Still waiting for a GPS fix." : "Position unavailable. Move to open sky."),
           { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 });
-      } catch (err) { onErr(1, "Location is blocked here."); }
+      } catch { onErr(1, "Location is blocked here."); }
     }
     stop() { if (this.id != null) { try { navigator.geolocation.clearWatch(this.id); } catch {} } this.id = null; }
   }
@@ -541,7 +633,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
   const gauss = () => { let u = 0, v = 0; while (!u) u = Math.random(); while (!v) v = Math.random(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
   class SimSource {
     constructor() {
-      // target m/s, accel, brake, hold seconds
       this.plan = [
         { v: 0, a: 2, b: 3, hold: 3 }, { v: 13.9, a: 2.6, b: 3, hold: 7 }, { v: 0, a: 2, b: 3.2, hold: 3 },
         { v: 27.8, a: 2.3, b: 2, hold: 6 }, { v: 32.5, a: 1.1, b: 2, hold: 6 }, { v: 25, a: 2, b: 1.6, hold: 5 },
@@ -554,7 +645,8 @@ v += acc * dt; x += v * dt;</code></pre></li>
       this.timer = setInterval(() => {
         const now = performance.now(), dt = Math.min((now - this.last) / 1000, 2); this.last = now;
         this.step(dt);
-        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4, lat: this.lat, lon: this.lon, heading: this.v > 0.8 ? this.hdg : NaN, alt: this.alt + gauss() * 0.8 });
+        onFix({ t: Date.now(), speed: Math.max(0, this.v + (this.v > 0 ? gauss() * 0.35 : 0)), acc: 3 + Math.random() * 4,
+          lat: this.lat, lon: this.lon, heading: this.v > 0.8 ? this.hdg : NaN, alt: this.alt + gauss() * 0.8 });
       }, 500);
     }
     step(dt) {
@@ -579,30 +671,29 @@ v += acc * dt; x += v * dt;</code></pre></li>
   let source = null;
   function useSource(mode) {
     if (source) source.stop();
-    kf.reset(); prevFix = null; state.est = 0;
+    kf.reset(); prevFix = null; state.est = 0; state.hdg = null;
     state.mode = mode;
     $("#modeSim").setAttribute("aria-pressed", mode === "sim");
     $("#modeGps").setAttribute("aria-pressed", mode === "gps");
     if (mode === "sim") {
       source = new SimSource(); source.start(onFix);
-      setStatus("sim", "Simulated drive · 2 Hz");
+      setStatus("sim", "Simulated drive");
     } else {
       source = new GpsSource();
       setStatus("wait", "Waiting for GPS fix");
       source.start(onFix, (code, msg) => {
         if (code === 1) {
-          $("#note").textContent = msg + " Showing the simulator instead. Host the file on HTTPS and allow location to use real GPS.";
+          $("#note").textContent = msg + " Back on the simulator. Allow location for this site in your browser settings, then tap Device GPS again.";
           useSource("sim");
           setStatus("bad", "Location blocked · simulator");
         } else setStatus("wait", msg);
       });
     }
   }
-
   function setStatus(s, text) { $("#status").dataset.s = s; $("#statusText").textContent = text; }
 
   // ---------- Theme tokens for canvas ----------
-  let T = {};
+  const T = {};
   function readTokens() {
     const cs = getComputedStyle(document.documentElement);
     ["ink", "muted", "line", "accent", "alert", "needle", "face", "panel", "alert-soft", "accent-soft", "ok"].forEach(k => T[k] = cs.getPropertyValue("--" + k).trim());
@@ -623,30 +714,39 @@ v += acc * dt; x += v * dt;</code></pre></li>
     return o;
   }
   const G = hidpi($("#gauge")), S = hidpi($("#spark"));
+  const DISPLAY_FONT = '"Saira Condensed","Arial Narrow",sans-serif', MONO_FONT = '"IBM Plex Mono",ui-monospace,monospace';
 
-  // ---------- Gauge ----------
+  function prep() {
+    const { ctx, w, h, dpr } = G;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    return { ctx, w, h, U: UNITS[state.unit] };
+  }
+  function drawGauge() {
+    if (!G.w) return;
+    ({ classic: drawClassic, sport: drawSport, digital: drawDigital, hud: drawHud })[state.style]();
+  }
+  function roundBar(ctx, x, y, w, h) {
+    ctx.beginPath();
+    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
+  }
+
+  // Classic: needle dial with a zone-coloured progress arc and a top-speed telltale
   const A0 = 0.75 * Math.PI, SWEEP = 1.5 * Math.PI;
   function drawClassic() {
-    const { ctx, w, h, dpr } = G; if (!w) return;
-    const U = UNITS[state.unit];
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
+    const { ctx, w, h, U } = prep();
     const cx = w / 2, cy = h / 2, R = Math.min(w, h) / 2 - 6;
     const ang = v => A0 + SWEEP * Math.min(Math.max(v / U.max, 0), 1);
     const shownU = state.shown * U.f, limU = state.limitMs * U.f;
 
-    // face
     const fg = ctx.createRadialGradient(cx, cy, R * 0.1, cx, cy, R);
     fg.addColorStop(0, T.panel); fg.addColorStop(1, T.face);
     ctx.beginPath(); ctx.arc(cx, cy, R, 0, Math.PI * 2); ctx.fillStyle = fg; ctx.fill();
     ctx.lineWidth = 1; ctx.strokeStyle = T.line; ctx.stroke();
 
     const rr = R * 0.86, bw = Math.max(6, R * 0.05);
-    ctx.lineCap = "butt";
-    ctx.lineWidth = bw; ctx.strokeStyle = T.line;
+    ctx.lineCap = "butt"; ctx.lineWidth = bw; ctx.strokeStyle = T.line;
     ctx.beginPath(); ctx.arc(cx, cy, rr, A0, A0 + SWEEP); ctx.stroke();
-    if (limU < U.max) {
-      ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke();
-    }
+    if (limU < U.max) { ctx.strokeStyle = T["alert-soft"]; ctx.beginPath(); ctx.arc(cx, cy, rr, ang(limU), A0 + SWEEP); ctx.stroke(); }
     if (shownU > 0.05) {
       let stroke = shownU > limU ? T.alert : T.accent;
       if (ctx.createConicGradient) {
@@ -668,11 +768,9 @@ v += acc * dt; x += v * dt;</code></pre></li>
       ctx.restore();
     }
 
-    // ticks
-    const tickOut = rr - bw / 2 - 4;
-    ctx.fillStyle = T.muted; ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    const fs = Math.max(11, R * 0.085);
-    ctx.font = `600 ${fs}px "Saira Condensed", "Arial Narrow", sans-serif`;
+    const tickOut = rr - bw / 2 - 4, fs = Math.max(11, R * 0.085);
+    ctx.textAlign = "center"; ctx.textBaseline = "middle";
+    ctx.font = `600 ${fs}px ${DISPLAY_FONT}`;
     for (let v = 0; v <= U.max + 1e-6; v += U.minor) {
       const a = ang(v), major = Math.abs(v / U.major - Math.round(v / U.major)) < 1e-6;
       const len = major ? R * 0.09 : R * 0.04;
@@ -688,15 +786,11 @@ v += acc * dt; x += v * dt;</code></pre></li>
         ctx.fillText(String(v), cx + Math.cos(a) * lr, cy + Math.sin(a) * lr);
       }
     }
-
-    // limit marker
     if (limU < U.max) {
       const a = ang(limU);
       ctx.fillStyle = T.alert;
       ctx.beginPath(); ctx.arc(cx + Math.cos(a) * (rr + bw), cy + Math.sin(a) * (rr + bw), Math.max(3, R * 0.018), 0, Math.PI * 2); ctx.fill();
     }
-
-    // needle
     const a = ang(shownU), nl = R * 0.74;
     ctx.save(); ctx.translate(cx, cy); ctx.rotate(a);
     ctx.shadowColor = "rgba(0,0,0,.35)"; ctx.shadowBlur = R * 0.03; ctx.shadowOffsetY = R * 0.008;
@@ -706,22 +800,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.055, 0, Math.PI * 2); ctx.fillStyle = T.ink; ctx.fill();
     ctx.beginPath(); ctx.arc(cx, cy, R * 0.022, 0, Math.PI * 2); ctx.fillStyle = T.needle; ctx.fill();
   }
-
-  // ---------- Display style dispatcher ----------
-  function prep() {
-    const { ctx, w, h, dpr } = G;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
-    return { ctx, w, h, U: UNITS[state.unit] };
-  }
-  function drawGauge() {
-    if (!G.w) return;
-    ({ classic: drawClassic, sport: drawSport, digital: drawDigital, hud: drawHud })[state.style]();
-  }
-  function roundBar(ctx, x, y, w, h) {
-    ctx.beginPath();
-    if (ctx.roundRect) ctx.roundRect(x, y, w, h, h / 2); else ctx.rect(x, y, w, h);
-  }
-  const DISPLAY_FONT = '"Saira Condensed","Arial Narrow",sans-serif', MONO_FONT = '"IBM Plex Mono",ui-monospace,monospace';
 
   // Sport: segmented LED arc, green → amber → red relative to the limit
   function drawSport() {
@@ -781,7 +859,6 @@ v += acc * dt; x += v * dt;</code></pre></li>
   // ---------- Sparkline ----------
   function drawSpark() {
     const { ctx, w, h, dpr } = S; if (!w) return;
-    const U = UNITS[state.unit];
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h);
     const N = 120, data = state.hist, pad = 6;
     const top = Math.max(state.limitMs * 1.15, ...data, 5);
@@ -813,16 +890,23 @@ v += acc * dt; x += v * dt;</code></pre></li>
     o.connect(g).connect(audioCtx.destination); o.start(t); o.stop(t + 0.18);
   }
 
-  // ---------- UI text ----------
+  // ---------- Text updates ----------
   const fmtTime = s => { s = Math.floor(s); const hh = Math.floor(s / 3600), mm = Math.floor(s / 60) % 60, ss = s % 60; return (hh ? hh + ":" + String(mm).padStart(2, "0") : mm) + ":" + String(ss).padStart(2, "0"); };
+  const speedText = () => state.unit === "ms" ? (state.shown * UNITS.ms.f).toFixed(1) : String(Math.round(state.shown * UNITS[state.unit].f));
   function updateText() {
-    const U = UNITS[state.unit], t = state.trip;
-    $("#speedNum").textContent = state.unit === "ms" ? (state.shown * U.f).toFixed(1) : Math.round(state.shown * U.f);
+    const U = UNITS[state.unit], t = state.trip, imp = state.unit === "mph";
+    $("#speedNum").textContent = speedText();
+    $("#tabDrive").textContent = document.body.dataset.view === "drive" ? "Drive" : speedText() + " " + U.label;
+    if (rec.on) {
+      const el = fmtTime((Date.now() - rec.start) / 1000);
+      $("#recPillT").textContent = "REC " + el;
+      $("#recInfo").textContent = "Recording · " + el + " · " + rec.points.length + " points";
+    }
+    if (document.body.dataset.view !== "trip") return;
     $("#tDist").textContent = (t.dist * U.df).toFixed(2);
     $("#tTime").textContent = fmtTime(t.elapsed);
     $("#tAvg").textContent = t.moving > 1 ? Math.round(t.dist / t.moving * U.f) : 0;
     $("#tMax").textContent = Math.round(t.max * U.f);
-    const imp = state.unit === "mph";
     if (state.hdg != null && state.est > 0.8) { $("#iHdg").textContent = compass(state.hdg) + " " + Math.round(state.hdg) + "°"; $("#arw").style.transform = `rotate(${Math.round(state.hdg)}deg)`; }
     else $("#iHdg").textContent = "—";
     $("#iAlt").textContent = state.alt == null ? "—" : Math.round(imp ? state.alt * 3.28084 : state.alt) + (imp ? " ft" : " m");
@@ -831,8 +915,8 @@ v += acc * dt; x += v * dt;</code></pre></li>
     $("#iLaunchK").textContent = imp ? "0–60 mph" : "0–100 km/h";
     $("#iLaunch").textContent = L.t0 !== null ? ((Date.now() - L.t0) / 1000).toFixed(1) + " s" : L.last ? L.last.toFixed(1) + " s" : L.armed ? "Ready" : "—";
     $("#iLaunch").title = L.best ? "Best " + L.best.toFixed(1) + " s" : "";
-    if (rec.on) $("#recInfo").textContent = "Recording · " + fmtTime((Date.now() - rec.start) / 1000) + " · " + rec.points.length + " points";
     $("#accText").textContent = state.acc != null ? "±" + Math.round(state.acc) + " m" : "±– m";
+    drawSpark();
   }
   function applyUnit() {
     const U = UNITS[state.unit];
@@ -842,26 +926,24 @@ v += acc * dt; x += v * dt;</code></pre></li>
     document.querySelectorAll("#unitSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.u === state.unit));
     $("#limit").value = Math.round(state.limitMs * U.f);
     $("#limit").step = state.unit === "ms" ? 1 : 5;
+    $("#limitSign").textContent = Math.round(state.limitMs * U.f);
   }
 
   // ---------- Main loop ----------
   let lastFrame = performance.now(), lastText = 0, lastSample = 0, lastAnnounce = 0;
   function frame(now) {
     const dt = Math.min((now - lastFrame) / 1000, 0.05); lastFrame = now;
-    let target = state.est;
+    const target = state.est;
     if (state.mode === "gps" && state.lastRecv && now - state.lastRecv > 5000) setStatus("bad", "Signal lost");
-
     if (reduceMotion) { state.shown = target; state.vel = 0; }
     else {
       const w = 6, a = w * w * (target - state.shown) - 2 * w * state.vel;
       state.vel += a * dt; state.shown = Math.max(0, state.shown + state.vel * dt);
     }
-
     const t = state.trip;
     t.elapsed += dt;
     if (state.est > 0.5) { t.dist += state.est * dt; t.moving += dt; }
     t.max = Math.max(t.max, state.est);
-
     if (now - lastSample > 500) { lastSample = now; state.hist.push(state.est); if (state.hist.length > 120) state.hist.shift(); }
 
     const over = state.shown > state.limitMs + 0.05;
@@ -869,76 +951,88 @@ v += acc * dt; x += v * dt;</code></pre></li>
     root.classList.toggle("warn", !over && state.shown >= state.limitMs * 0.9 && state.shown > 1);
     if (over && state.sound && now - lastBeep > 1500) { lastBeep = now; beep(); try { navigator.vibrate?.([120, 80, 120]); } catch {} }
 
-    drawGauge();
-    if (now - lastText > 100) { lastText = now; updateText(); drawSpark(); }
-    if (now - lastAnnounce > 5000) { lastAnnounce = now; $("#live").textContent = $("#speedNum").textContent + " " + UNITS[state.unit].label + (over ? ", over limit" : ""); }
+    if (document.body.dataset.view === "drive") drawGauge();
+    if (now - lastText > 100) { lastText = now; updateText(); }
+    if (now - lastAnnounce > 5000 && document.body.dataset.view === "drive") { lastAnnounce = now; $("#live").textContent = speedText() + " " + UNITS[state.unit].label + (over ? ", over limit" : ""); }
     requestAnimationFrame(frame);
   }
 
+  // ---------- Switch helper ----------
+  const setSwitch = (el, on) => el.setAttribute("aria-checked", on ? "true" : "false");
+
+  // ---------- Display style ----------
+  function applyStyle() {
+    const d = $("#dial");
+    d.dataset.style = state.style;
+    document.querySelectorAll("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === state.style));
+    document.querySelectorAll("#styleDots i").forEach((dot, i) => dot.classList.toggle("on", STYLES[i] === state.style));
+    $("#styleHint").textContent = STYLE_NAMES[state.style] + " · tap the dial to switch style";
+    d.classList.toggle("mirror", state.style === "hud" && state.mirror);
+    $("#mirrorSw").disabled = state.style !== "hud";
+    setSwitch($("#mirrorSw"), state.mirror);
+    document.body.classList.toggle("hudbg", state.style === "hud");
+  }
+  function setStyle(st) { state.style = st; store.set("style", st); applyStyle(); }
+  document.querySelectorAll("#styleSeg button").forEach(b => b.onclick = () => setStyle(b.dataset.st));
+  const cycleStyle = () => setStyle(STYLES[(STYLES.indexOf(state.style) + 1) % STYLES.length]);
+  $("#dial").addEventListener("click", cycleStyle);
+  $("#dial").addEventListener("keydown", e => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); cycleStyle(); } });
+  $("#mirrorSw").onclick = () => { state.mirror = !state.mirror; store.set("mirror", state.mirror); applyStyle(); };
+
   // ---------- Controls ----------
   $("#modeSim").onclick = () => useSource("sim");
-  $("#modeGps").onclick = () => { $("#note").textContent = "Requesting location. Allow it in the browser prompt."; useSource("gps"); };
-  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => { state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips(); });
+  $("#modeGps").onclick = () => { $("#note").textContent = "Requesting location. Allow it when your browser asks."; useSource("gps"); };
+  document.querySelectorAll("#unitSeg button").forEach(b => b.onclick = () => {
+    state.unit = b.dataset.u; store.set("unit", state.unit); state.launch.last = state.launch.best = null; applyUnit(); renderTrips();
+  });
   function setLimit(vU) {
     const U = UNITS[state.unit];
     vU = Math.min(Math.max(Number(vU) || 0, 5), U.max);
-    state.limitMs = vU / U.f; store.set("limitMs", state.limitMs); $("#limit").value = Math.round(vU);
+    state.limitMs = vU / U.f; store.set("limitMs", state.limitMs); applyUnit();
   }
   $("#limit").addEventListener("change", e => setLimit(e.target.value));
   $("#limUp").onclick = () => setLimit(Number($("#limit").value) + Number($("#limit").step));
   $("#limDown").onclick = () => setLimit(Number($("#limit").value) - Number($("#limit").step));
-  $("#resetTrip").onclick = () => { state.trip = { dist: 0, moving: 0, elapsed: 0, max: 0 }; state.hist = []; };
-  $("#soundBtn").onclick = e => {
-    state.sound = !state.sound; e.currentTarget.setAttribute("aria-pressed", state.sound);
-    e.currentTarget.textContent = state.sound ? "Chime on" : "Chime when over limit";
+  $("#resetTrip").onclick = () => { state.trip = { dist: 0, moving: 0, elapsed: 0, max: 0 }; state.hist = []; state.launch.last = state.launch.best = null; };
+  $("#soundSw").onclick = () => {
+    state.sound = !state.sound;
     if (state.sound) { try { audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)(); audioCtx.resume(); beep(); } catch { state.sound = false; } }
+    setSwitch($("#soundSw"), state.sound);
   };
+
+  // ---------- Wake lock ----------
   let wakeLock = null;
   async function requestWake() {
-    try { wakeLock = await navigator.wakeLock.request("screen"); return true; } catch { return false; }
+    try {
+      wakeLock = await navigator.wakeLock.request("screen");
+      wakeLock.addEventListener?.("release", () => { if (document.visibilityState === "visible") { wakeLock = null; setSwitch($("#wakeSw"), false); } });
+      setSwitch($("#wakeSw"), true); return true;
+    } catch { $("#wakeSub").textContent = "This browser can't keep the screen on. Raise the auto-lock time in your phone settings instead."; setSwitch($("#wakeSw"), false); return false; }
   }
-  $("#wakeBtn").onclick = async e => {
-    const btn = e.currentTarget;
-    if (wakeLock) { try { await wakeLock.release(); } catch {} wakeLock = null; btn.setAttribute("aria-pressed", "false"); btn.textContent = "Keep screen on"; return; }
-    if (await requestWake()) { btn.setAttribute("aria-pressed", "true"); btn.textContent = "Screen stays on"; }
-    else btn.textContent = "Not supported here";
-  };
-  document.addEventListener("visibilitychange", () => { if (wakeLock && document.visibilityState === "visible") requestWake(); });
+  async function releaseWake() { try { await wakeLock?.release(); } catch {} wakeLock = null; setSwitch($("#wakeSw"), false); }
+  $("#wakeSw").onclick = () => wakeLock ? releaseWake() : requestWake();
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && $("#wakeSw").getAttribute("aria-checked") === "true" && !wakeLock) requestWake(); });
 
-  // ---------- Display style + drive mode ----------
-  function applyStyle() {
-    const d = $(".dial");
-    d.dataset.style = state.style;
-    document.querySelectorAll("#styleSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.st === state.style));
-    $("#mirrorBtn").hidden = state.style !== "hud";
-    if (state.style !== "hud") { d.classList.remove("mirror"); $("#mirrorBtn").setAttribute("aria-pressed", "false"); }
-    document.body.classList.toggle("hudbg", state.style === "hud");
-  }
-  document.querySelectorAll("#styleSeg button").forEach(b => b.onclick = () => { state.style = b.dataset.st; store.set("style", state.style); applyStyle(); });
-  $("#mirrorBtn").onclick = e => {
-    const on = $(".dial").classList.toggle("mirror");
-    e.currentTarget.setAttribute("aria-pressed", on);
-  };
+  // ---------- Drive mode ----------
   function setDrive(on) {
     document.body.classList.toggle("drive", on);
-    const btn = $("#driveBtn");
-    btn.setAttribute("aria-pressed", on); btn.textContent = on ? "Exit drive mode" : "Drive mode";
+    $("#fsBtn").setAttribute("aria-pressed", on);
+    $("#fsIcon").innerHTML = on ? '<path d="M9 4v5H4M15 4v5h5M9 20v-5H4M15 20v-5h5"/>' : '<path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/>';
     if (on) {
       const p = document.documentElement.requestFullscreen?.(); if (p) p.catch(() => {});
-      if (!wakeLock) requestWake().then(ok => { if (ok) { $("#wakeBtn").setAttribute("aria-pressed", "true"); $("#wakeBtn").textContent = "Screen stays on"; } });
-      window.scrollTo(0, 0);
+      if (!wakeLock) requestWake();
     } else if (document.fullscreenElement) {
       const p = document.exitFullscreen?.(); if (p) p.catch(() => {});
     }
   }
-  $("#driveBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
+  $("#fsBtn").onclick = () => setDrive(!document.body.classList.contains("drive"));
   document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && document.body.classList.contains("drive")) setDrive(false); });
 
   // ---------- Trip log ----------
   const loadTrips = () => { const a = store.get("trips", []); return Array.isArray(a) ? a : []; };
   function renderTrips() {
     const U = UNITS[state.unit], list = $("#trips"), trips = loadTrips();
-    if (!trips.length) { list.innerHTML = '<li><span>No trips saved yet.</span></li>'; return; }
+    if (!trips.length) { list.innerHTML = '<li><span>No trips saved yet. Tap Start recording before you set off.</span></li>'; return; }
     list.innerHTML = trips.slice().reverse().map(tr => {
       const d = new Date(tr.start);
       const when = d.toLocaleDateString(undefined, { month: "short", day: "numeric" }) + ", " + d.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
@@ -974,9 +1068,10 @@ v += acc * dt; x += v * dt;</code></pre></li>
     if (!rec.on) {
       rec.on = true; rec.points = []; rec.start = Date.now(); rec.trip0 = { ...state.trip };
       btn.textContent = "Stop & save"; btn.classList.add("rec"); btn.classList.remove("primary"); btn.setAttribute("aria-pressed", "true");
+      $("#recPill").hidden = false;
       return;
     }
-    rec.on = false;
+    rec.on = false; $("#recPill").hidden = true;
     btn.textContent = "Start recording"; btn.classList.remove("rec"); btn.classList.add("primary"); btn.setAttribute("aria-pressed", "false");
     if (rec.points.length < 2) { $("#recInfo").textContent = "Nothing to save yet. Record for a few seconds while moving."; return; }
     let pts = rec.points; const step = Math.ceil(pts.length / 1500); if (step > 1) pts = pts.filter((_, i) => i % step === 0);
@@ -988,6 +1083,7 @@ v += acc * dt; x += v * dt;</code></pre></li>
     $("#recInfo").textContent = saved ? "Trip saved. Export it as GPX or CSV below." : "Couldn't save: this browser's storage is full or blocked. Delete an old trip and try again.";
     renderTrips();
   };
+  $("#recPill").addEventListener("click", () => { location.hash = "#trip"; });
 
   // ---------- Theme ----------
   function applyTheme(th) {
@@ -995,15 +1091,32 @@ v += acc * dt; x += v * dt;</code></pre></li>
     document.querySelectorAll("#themeSeg button").forEach(b => b.setAttribute("aria-pressed", b.dataset.th === th));
   }
   document.querySelectorAll("#themeSeg button").forEach(b => b.onclick = () => { store.set("theme", b.dataset.th); applyTheme(b.dataset.th); });
-  applyTheme(["auto", "light", "dark"].includes(store.get("theme", "auto")) ? store.get("theme", "auto") : "auto");
+  applyTheme(pick("theme", "auto", v => ["auto", "light", "dark"].includes(v)));
+
+  // ---------- Router ----------
+  const VIEWS = ["drive", "trip", "settings", "about"];
+  const TITLES = { drive: "Pacer Speedometer", trip: "Trip · Pacer", settings: "Settings · Pacer", about: "About · Pacer" };
+  function route() {
+    let v = (location.hash || "#drive").slice(1);
+    if (!VIEWS.includes(v)) v = "drive";
+    if (v !== "drive" && document.body.classList.contains("drive")) setDrive(false);
+    document.querySelectorAll(".view").forEach(s => s.hidden = s.dataset.view !== v);
+    document.querySelectorAll(".tabs a").forEach(a => a.setAttribute("aria-current", a.dataset.to === v ? "page" : "false"));
+    document.body.dataset.view = v;
+    document.title = TITLES[v];
+    window.scrollTo(0, 0);
+    updateText();
+  }
+  addEventListener("hashchange", route);
+  document.querySelectorAll("[data-scroll]").forEach(b => b.onclick = () => document.getElementById(b.dataset.scroll)?.scrollIntoView({ behavior: reduceMotion ? "auto" : "smooth" }));
 
   applyUnit();
-  renderTrips();
   applyStyle();
+  renderTrips();
   useSource("sim");
+  route();
   requestAnimationFrame(frame);
 })();
 </script>
-
 </body>
 </html>

@@ -4,6 +4,14 @@ A GPS speedometer that runs in the browser: Kalman-filtered speed, a 60 fps dial
 
 **Live:** https://vishai12345.github.io/speedometer/
 
+## Screens
+- **Drive** (`#drive`): the speedometer only, with the limit sign, recording indicator and a drive-mode button. Tap the dial to switch style.
+- **Trip** (`#trip`): trip computer, heading, altitude, G meter, 0–100 timer, 60-second graph, recording and trip log with GPX/CSV export.
+- **Settings** (`#settings`): speed source, units, style, HUD mirror, theme, speed limit, alerts, keep screen on.
+- **About** (`#about`): how it works.
+
+All screens live in one page, so GPS and recording keep running while you switch tabs.
+
 ## Use
 1. Open the live link on your phone in Safari or Chrome.
 2. Tap **Device GPS** and allow location.
