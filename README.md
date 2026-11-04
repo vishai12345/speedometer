@@ -25,9 +25,22 @@ A GPS speedometer that runs in your phone's browser. No app store, no account, n
 - `tests/ui_scenarios.py` — browser scenario tests with a fake GPS (Playwright): `python3 -m http.server 8765 & python3 tests/ui_scenarios.py`
 - `.github/workflows/ci.yml` — continuous integration workflow executing unit and browser test suites.
 - `.github/workflows/renovate.yml` — scheduled workflow running `renovatebot/github-action` to open dependency updates.
+- `Dockerfile` — unprivileged, non-root Nginx container image for serving the app locally.
+- `.dockerignore` — build context filter to keep container builds minimal.
 - `docs/VERIFICATION.md` — requirement-by-requirement verification report with test evidence (v3.1).
 - `docs/REVIEW-RESPONSE.md` — v3.0 audit and engineering decisions.
 - `docs/test-results/`, `docs/screenshots/` — raw test output and screenshots from the latest run.
+
+## Docker
+
+Build and run locally without pushing anywhere:
+
+```bash
+docker build -t speedometer .
+docker run --rm -p 8080:8080 speedometer
+```
+
+Open `http://localhost:8080` in your browser.
 
 ## Deploy
 Static files only. GitHub Pages serves `main` / root over HTTPS, which browsers require for location.

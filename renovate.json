@@ -40,6 +40,13 @@
         "npm"
       ],
       "groupName": "npm dependencies"
+    },
+    {
+      "description": "Group Docker image updates",
+      "matchManagers": [
+        "dockerfile"
+      ],
+      "groupName": "Docker images"
     }
   ],
   "vulnerabilityAlerts": {

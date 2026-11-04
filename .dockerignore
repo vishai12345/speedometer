@@ -1,0 +1,27 @@
+# Git
+.git/
+.gitignore
+
+# CI/CD and Renovate
+.github/
+renovate.json
+
+# Documentation and reports
+docs/
+*.md
+LICENSE
+
+# Test suites and development configs
+tests/
+package.json
+package-lock.json
+requirements.txt
+__pycache__/
+*.pyc
+
+# Docker files
+Dockerfile*
+.dockerignore
+compose*.yaml
+docker-compose*.yml
+
