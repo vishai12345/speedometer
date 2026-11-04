@@ -18,8 +18,13 @@ A GPS speedometer that runs in your phone's browser. No app store, no account, n
 ## Files
 - `index.html` — the app (UI, rendering, recording, permissions).
 - `engine.js` — measurement engine with no DOM: fix validation, Kalman speed filter, signal states, distance, 0–100 timing, overspeed alerting.
-- `tests/engine.test.js` — engine tests on synthetic GPS traces with known ground truth: `node tests/engine.test.js`
+- `package.json` — project metadata and test runner scripts (`npm test`).
+- `renovate.json` — Mend Renovate configuration for automated dependency and GitHub Actions updates.
+- `requirements.txt` — Python dependencies for the browser test suite.
+- `tests/engine.test.js` — engine tests on synthetic GPS traces with known ground truth: `npm test` or `node tests/engine.test.js`
 - `tests/ui_scenarios.py` — browser scenario tests with a fake GPS (Playwright): `python3 -m http.server 8765 & python3 tests/ui_scenarios.py`
+- `.github/workflows/ci.yml` — continuous integration workflow executing unit and browser test suites.
+- `.github/workflows/renovate.yml` — scheduled workflow running `renovatebot/github-action` to open dependency updates.
 - `docs/VERIFICATION.md` — requirement-by-requirement verification report with test evidence (v3.1).
 - `docs/REVIEW-RESPONSE.md` — v3.0 audit and engineering decisions.
 - `docs/test-results/`, `docs/screenshots/` — raw test output and screenshots from the latest run.

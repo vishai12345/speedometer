@@ -1,0 +1,53 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for Pacer Speedometer",
+  "extends": [
+    "config:recommended"
+  ],
+  "dependencyDashboard": true,
+  "semanticCommits": "enabled",
+  "labels": [
+    "dependencies"
+  ],
+  "packageRules": [
+    {
+      "description": "Pin and update GitHub Actions",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "pinDigests": true,
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "Group non-major updates together",
+      "matchUpdateTypes": [
+        "minor",
+        "patch"
+      ],
+      "groupName": "all non-major dependencies",
+      "groupSlug": "all-minor-patch"
+    },
+    {
+      "description": "Group Python dependencies",
+      "matchManagers": [
+        "pip_requirements"
+      ],
+      "groupName": "Python dependencies"
+    },
+    {
+      "description": "Group npm dependencies",
+      "matchManagers": [
+        "npm"
+      ],
+      "groupName": "npm dependencies"
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security",
+      "dependencies"
+    ]
+  }
+}
+
