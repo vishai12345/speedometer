@@ -1,6 +1,6 @@
 # syntax=docker/dockerfile:1
 
-FROM nginxinc/nginx-unprivileged:1.27-alpine-slim
+FROM nginxinc/nginx-unprivileged:1.31-alpine-slim
 
 LABEL org.opencontainers.image.title="Pacer Speedometer" \
       org.opencontainers.image.description="A GPS speedometer that runs in phone browsers with zero server dependencies" \
